@@ -7,14 +7,21 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from placebrain_contracts.auth_pb2 import (
     GetMeRequest,
-    LoginRequest as GrpcLoginRequest,
-    LogoutRequest as GrpcLogoutRequest,
     RefreshTokensRequest,
+)
+from placebrain_contracts.auth_pb2 import (
+    LoginRequest as GrpcLoginRequest,
+)
+from placebrain_contracts.auth_pb2 import (
+    LogoutRequest as GrpcLogoutRequest,
+)
+from placebrain_contracts.auth_pb2 import (
     RegisterRequest as GrpcRegisterRequest,
 )
 from placebrain_contracts.auth_pb2_grpc import AuthServiceStub
 
 from src.dependencies.auth import AuthenticatedUser
+
 from .schemas import (
     LogoutRequest,
     LogoutResponse,
@@ -47,9 +54,7 @@ def _handle_grpc_error(e: grpc.aio.AioRpcError) -> None:
 async def register(body: RegisterRequest, stub: FromDishka[AuthServiceStub]):
     try:
         response = await stub.Register(
-            GrpcRegisterRequest(
-                username=body.username, email=body.email, password=body.password
-            )
+            GrpcRegisterRequest(username=body.username, email=body.email, password=body.password)
         )
         return RegisterResponse(user_id=response.user_id)
     except grpc.aio.AioRpcError as e:
@@ -75,9 +80,7 @@ async def login(
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(body: RefreshRequest, stub: FromDishka[AuthServiceStub]):
     try:
-        response = await stub.RefreshTokens(
-            RefreshTokensRequest(refresh_token=body.refresh_token)
-        )
+        response = await stub.RefreshTokens(RefreshTokensRequest(refresh_token=body.refresh_token))
         return TokenResponse(
             access_token=response.access_token, refresh_token=response.refresh_token
         )
@@ -88,9 +91,7 @@ async def refresh(body: RefreshRequest, stub: FromDishka[AuthServiceStub]):
 @router.post("/logout", response_model=LogoutResponse)
 async def logout(body: LogoutRequest, stub: FromDishka[AuthServiceStub]):
     try:
-        response = await stub.Logout(
-            GrpcLogoutRequest(refresh_token=body.refresh_token)
-        )
+        response = await stub.Logout(GrpcLogoutRequest(refresh_token=body.refresh_token))
         return LogoutResponse(success=response.success)
     except grpc.aio.AioRpcError as e:
         _handle_grpc_error(e)
@@ -102,9 +103,7 @@ async def get_me(
     current_user: AuthenticatedUser,
 ):
     try:
-        response = await stub.GetMe(
-            GetMeRequest(user_id=current_user.user_id)
-        )
+        response = await stub.GetMe(GetMeRequest(user_id=current_user.user_id))
         return UserResponse(
             user_id=response.user_id,
             username=response.username,
