@@ -6,9 +6,9 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 
-from src.api.auth import router as auth_router
+from src.api import api_router
 from src.api.exception_handlers import register_exception_handlers
-from src.api.places import router as places_router
+from src.api.utils import generate_openapi_file
 from src.core.config import settings
 from src.dependencies.config import ConfigProvider
 from src.dependencies.grpc import GrpcProvider
@@ -26,6 +26,7 @@ async def lifespan(app: FastAPI):
         format=settings.logging.format,
         datefmt=settings.logging.date_format,
     )
+    generate_openapi_file(app)
     try:
         yield
     finally:
@@ -34,6 +35,5 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, default_response_class=ORJSONResponse)
 register_exception_handlers(app)
-app.include_router(auth_router)
-app.include_router(places_router)
+app.include_router(api_router)
 setup_dishka(container, app)
