@@ -1,0 +1,208 @@
+from dishka.integrations.fastapi import DishkaRoute, FromDishka
+from fastapi import APIRouter
+from placebrain_contracts.places_pb2 import (
+    AddMemberRequest as GrpcAddMemberRequest,
+)
+from placebrain_contracts.places_pb2 import (
+    CreatePlaceRequest as GrpcCreatePlaceRequest,
+)
+from placebrain_contracts.places_pb2 import (
+    DeletePlaceRequest as GrpcDeletePlaceRequest,
+)
+from placebrain_contracts.places_pb2 import (
+    GetPlaceRequest as GrpcGetPlaceRequest,
+)
+from placebrain_contracts.places_pb2 import (
+    ListMembersRequest as GrpcListMembersRequest,
+)
+from placebrain_contracts.places_pb2 import (
+    ListPlacesRequest as GrpcListPlacesRequest,
+)
+from placebrain_contracts.places_pb2 import (
+    RemoveMemberRequest as GrpcRemoveMemberRequest,
+)
+from placebrain_contracts.places_pb2 import (
+    UpdateMemberRoleRequest as GrpcUpdateMemberRoleRequest,
+)
+from placebrain_contracts.places_pb2 import (
+    UpdatePlaceRequest as GrpcUpdatePlaceRequest,
+)
+from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
+
+from src.dependencies.auth import AuthenticatedUser
+
+from .schemas import (
+    AddMemberRequest,
+    CreatePlaceRequest,
+    CreatePlaceResponse,
+    DeletePlaceResponse,
+    MemberListResponse,
+    MemberResponse,
+    PlaceListResponse,
+    PlaceResponse,
+    SuccessResponse,
+    UpdateMemberRoleRequest,
+    UpdatePlaceRequest,
+    UpdatePlaceResponse,
+)
+
+router = APIRouter(prefix="/places", route_class=DishkaRoute)
+
+_ROLE_MAP = {0: "unspecified", 1: "owner", 2: "admin", 3: "viewer"}
+_ROLE_REVERSE = {"owner": 1, "admin": 2, "viewer": 3}
+
+
+@router.post("", response_model=CreatePlaceResponse)
+async def create_place(
+    body: CreatePlaceRequest,
+    stub: FromDishka[PlacesServiceStub],
+    current_user: AuthenticatedUser,
+):
+    response = await stub.CreatePlace(
+        GrpcCreatePlaceRequest(
+            user_id=current_user.user_id,
+            name=body.name,
+            description=body.description,
+        )
+    )
+    return CreatePlaceResponse(place_id=response.place_id)
+
+
+@router.get("", response_model=PlaceListResponse)
+async def list_places(
+    stub: FromDishka[PlacesServiceStub],
+    current_user: AuthenticatedUser,
+):
+    response = await stub.ListPlaces(GrpcListPlacesRequest(user_id=current_user.user_id))
+    return PlaceListResponse(
+        places=[
+            PlaceResponse(
+                place_id=p.place_id,
+                name=p.name,
+                description=p.description,
+                user_role=_ROLE_MAP.get(p.user_role, "unspecified"),
+            )
+            for p in response.places
+        ]
+    )
+
+
+@router.get("/{place_id}", response_model=PlaceResponse)
+async def get_place(
+    place_id: str,
+    stub: FromDishka[PlacesServiceStub],
+    current_user: AuthenticatedUser,
+):
+    response = await stub.GetPlace(
+        GrpcGetPlaceRequest(user_id=current_user.user_id, place_id=place_id)
+    )
+    return PlaceResponse(
+        place_id=response.place_id,
+        name=response.name,
+        description=response.description,
+        user_role=_ROLE_MAP.get(response.user_role, "unspecified"),
+    )
+
+
+@router.put("/{place_id}", response_model=UpdatePlaceResponse)
+async def update_place(
+    place_id: str,
+    body: UpdatePlaceRequest,
+    stub: FromDishka[PlacesServiceStub],
+    current_user: AuthenticatedUser,
+):
+    response = await stub.UpdatePlace(
+        GrpcUpdatePlaceRequest(
+            user_id=current_user.user_id,
+            place_id=place_id,
+            name=body.name,
+            description=body.description,
+        )
+    )
+    return UpdatePlaceResponse(place_id=response.place_id)
+
+
+@router.delete("/{place_id}", response_model=DeletePlaceResponse)
+async def delete_place(
+    place_id: str,
+    stub: FromDishka[PlacesServiceStub],
+    current_user: AuthenticatedUser,
+):
+    response = await stub.DeletePlace(
+        GrpcDeletePlaceRequest(user_id=current_user.user_id, place_id=place_id)
+    )
+    return DeletePlaceResponse(success=response.success)
+
+
+@router.post("/{place_id}/members", response_model=SuccessResponse)
+async def add_member(
+    place_id: str,
+    body: AddMemberRequest,
+    stub: FromDishka[PlacesServiceStub],
+    current_user: AuthenticatedUser,
+):
+    response = await stub.AddMember(
+        GrpcAddMemberRequest(
+            user_id=current_user.user_id,
+            place_id=place_id,
+            target_user_id=body.target_user_id,
+            role=_ROLE_REVERSE.get(body.role, 0),
+        )
+    )
+    return SuccessResponse(success=response.success)
+
+
+@router.delete("/{place_id}/members/{user_id}", response_model=SuccessResponse)
+async def remove_member(
+    place_id: str,
+    user_id: str,
+    stub: FromDishka[PlacesServiceStub],
+    current_user: AuthenticatedUser,
+):
+    response = await stub.RemoveMember(
+        GrpcRemoveMemberRequest(
+            user_id=current_user.user_id,
+            place_id=place_id,
+            target_user_id=user_id,
+        )
+    )
+    return SuccessResponse(success=response.success)
+
+
+@router.put("/{place_id}/members/{user_id}", response_model=SuccessResponse)
+async def update_member_role(
+    place_id: str,
+    user_id: str,
+    body: UpdateMemberRoleRequest,
+    stub: FromDishka[PlacesServiceStub],
+    current_user: AuthenticatedUser,
+):
+    response = await stub.UpdateMemberRole(
+        GrpcUpdateMemberRoleRequest(
+            user_id=current_user.user_id,
+            place_id=place_id,
+            target_user_id=user_id,
+            role=_ROLE_REVERSE.get(body.role, 0),
+        )
+    )
+    return SuccessResponse(success=response.success)
+
+
+@router.get("/{place_id}/members", response_model=MemberListResponse)
+async def list_members(
+    place_id: str,
+    stub: FromDishka[PlacesServiceStub],
+    current_user: AuthenticatedUser,
+):
+    response = await stub.ListMembers(
+        GrpcListMembersRequest(user_id=current_user.user_id, place_id=place_id)
+    )
+    return MemberListResponse(
+        members=[
+            MemberResponse(
+                user_id=m.user_id,
+                role=_ROLE_MAP.get(m.role, "unspecified"),
+            )
+            for m in response.members
+        ]
+    )

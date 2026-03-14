@@ -21,4 +21,4 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 ENTRYPOINT []
 
-CMD ["uv", "run", "hypercorn", "src.main:app",  "--bind", "::", "--reload"]
+CMD ["sh", "-c", "hypercorn src.main:app --bind :: --reload"]

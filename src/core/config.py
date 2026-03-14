@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     logging: LoggingConfig = Field(...)
     debug: bool = False
     auth_service_url: str = Field(...)
+    places_service_url: str = Field(...)
     jwt_secret: str = Field(...)
 
     class Config:
