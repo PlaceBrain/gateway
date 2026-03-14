@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     debug: bool = False
     auth_service_url: str = Field(...)
     places_service_url: str = Field(...)
+    devices_service_url: str = Field(...)
     jwt_secret: str = Field(...)
 
     class Config:
