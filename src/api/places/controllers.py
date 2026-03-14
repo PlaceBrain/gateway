@@ -1,5 +1,9 @@
+import asyncio
+
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter
+from placebrain_contracts.auth_pb2 import GetMeRequest, GetUserByEmailRequest
+from placebrain_contracts.auth_pb2_grpc import AuthServiceStub
 from placebrain_contracts.places_pb2 import (
     AddMemberRequest as GrpcAddMemberRequest,
 )
@@ -139,13 +143,15 @@ async def add_member(
     place_id: str,
     body: AddMemberRequest,
     stub: FromDishka[PlacesServiceStub],
+    auth_stub: FromDishka[AuthServiceStub],
     current_user: AuthenticatedUser,
 ):
+    user_response = await auth_stub.GetUserByEmail(GetUserByEmailRequest(email=body.email))
     response = await stub.AddMember(
         GrpcAddMemberRequest(
             user_id=current_user.user_id,
             place_id=place_id,
-            target_user_id=body.target_user_id,
+            target_user_id=user_response.user_id,
             role=_ROLE_REVERSE.get(body.role, 0),
         )
     )
@@ -192,15 +198,23 @@ async def update_member_role(
 async def list_members(
     place_id: str,
     stub: FromDishka[PlacesServiceStub],
+    auth_stub: FromDishka[AuthServiceStub],
     current_user: AuthenticatedUser,
 ):
     response = await stub.ListMembers(
         GrpcListMembersRequest(user_id=current_user.user_id, place_id=place_id)
     )
+
+    user_infos = await asyncio.gather(
+        *(auth_stub.GetMe(GetMeRequest(user_id=m.user_id)) for m in response.members)
+    )
+    username_map = {info.user_id: info.username for info in user_infos}
+
     return MemberListResponse(
         members=[
             MemberResponse(
                 user_id=m.user_id,
+                username=username_map.get(m.user_id, m.user_id),
                 role=_ROLE_MAP.get(m.role, "unspecified"),
             )
             for m in response.members

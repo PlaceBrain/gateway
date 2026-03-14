@@ -35,12 +35,13 @@ class DeletePlaceResponse(BaseModel):
 
 
 class AddMemberRequest(BaseModel):
-    target_user_id: str
+    email: str
     role: str
 
 
 class MemberResponse(BaseModel):
     user_id: str
+    username: str
     role: str
 
 
