@@ -30,7 +30,7 @@ from .schemas import (
     UserResponse,
 )
 
-router = APIRouter(prefix="/auth", route_class=DishkaRoute)
+router = APIRouter(prefix="/auth", tags=["auth"], route_class=DishkaRoute)
 
 
 @router.post("/register", response_model=RegisterResponse)

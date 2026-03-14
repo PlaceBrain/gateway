@@ -46,7 +46,7 @@ from .schemas import (
     UpdatePlaceResponse,
 )
 
-router = APIRouter(prefix="/places", route_class=DishkaRoute)
+router = APIRouter(prefix="/places", tags=["places"], route_class=DishkaRoute)
 
 _ROLE_MAP = {0: "unspecified", 1: "owner", 2: "admin", 3: "viewer"}
 _ROLE_REVERSE = {"owner": 1, "admin": 2, "viewer": 3}
