@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     auth_service_url: str = Field(...)
     places_service_url: str = Field(...)
     devices_service_url: str = Field(...)
+    collector_service_url: str = Field(default="placebrain-collector-service:50054")
     jwt_secret: str = Field(...)
 
     class Config:
