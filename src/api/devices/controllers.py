@@ -1,5 +1,10 @@
+import logging
+
+import grpc
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter
+from placebrain_contracts.collector_pb2 import DeleteReadingsRequest
+from placebrain_contracts.collector_pb2_grpc import CollectorServiceStub
 from placebrain_contracts.devices_pb2 import (
     CreateActuatorRequest as GrpcCreateActuatorRequest,
 )
@@ -90,6 +95,8 @@ from .schemas import (
     UpdateSensorResponse,
 )
 from .schemas import SendCommandRequest as SendCommandBody
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/places/{place_id}/devices", tags=["devices"], route_class=DishkaRoute)
 mqtt_router = APIRouter(prefix="/mqtt", tags=["mqtt"], route_class=DishkaRoute)
@@ -216,6 +223,7 @@ async def delete_device(
     place_id: str,
     device_id: str,
     stub: FromDishka[DevicesServiceStub],
+    collector_stub: FromDishka[CollectorServiceStub],
     current_user: AuthenticatedUser,
 ):
     response = await stub.DeleteDevice(
@@ -223,6 +231,10 @@ async def delete_device(
             user_id=current_user.user_id, place_id=place_id, device_id=device_id
         )
     )
+    try:
+        await collector_stub.DeleteReadings(DeleteReadingsRequest(device_ids=[device_id]))
+    except grpc.aio.AioRpcError:
+        logger.warning("Failed to cleanup readings for device %s", device_id)
     return SuccessResponse(success=response.success)
 
 

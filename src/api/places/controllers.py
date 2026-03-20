@@ -1,9 +1,17 @@
 import asyncio
+import logging
 
+import grpc
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter
 from placebrain_contracts.auth_pb2 import GetMeRequest, GetUserByEmailRequest
 from placebrain_contracts.auth_pb2_grpc import AuthServiceStub
+from placebrain_contracts.collector_pb2 import DeleteReadingsRequest
+from placebrain_contracts.collector_pb2_grpc import CollectorServiceStub
+from placebrain_contracts.devices_pb2 import (
+    DeleteDevicesByPlaceRequest as GrpcDeleteDevicesByPlaceRequest,
+)
+from placebrain_contracts.devices_pb2_grpc import DevicesServiceStub
 from placebrain_contracts.places_pb2 import (
     AddMemberRequest as GrpcAddMemberRequest,
 )
@@ -49,6 +57,8 @@ from .schemas import (
     UpdatePlaceRequest,
     UpdatePlaceResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/places", tags=["places"], route_class=DishkaRoute)
 
@@ -130,12 +140,25 @@ async def update_place(
 async def delete_place(
     place_id: str,
     stub: FromDishka[PlacesServiceStub],
+    devices_stub: FromDishka[DevicesServiceStub],
+    collector_stub: FromDishka[CollectorServiceStub],
     current_user: AuthenticatedUser,
 ):
-    response = await stub.DeletePlace(
-        GrpcDeletePlaceRequest(user_id=current_user.user_id, place_id=place_id)
-    )
-    return DeletePlaceResponse(success=response.success)
+    await stub.DeletePlace(GrpcDeletePlaceRequest(user_id=current_user.user_id, place_id=place_id))
+    try:
+        response = await devices_stub.DeleteDevicesByPlace(
+            GrpcDeleteDevicesByPlaceRequest(place_id=place_id)
+        )
+        if response.device_ids:
+            try:
+                await collector_stub.DeleteReadings(
+                    DeleteReadingsRequest(device_ids=response.device_ids)
+                )
+            except grpc.aio.AioRpcError:
+                logger.warning("Failed to cleanup readings for place %s", place_id)
+    except grpc.aio.AioRpcError:
+        logger.warning("Failed to cleanup devices for place %s", place_id)
+    return DeletePlaceResponse(success=True)
 
 
 @router.post("/{place_id}/members", response_model=SuccessResponse)
