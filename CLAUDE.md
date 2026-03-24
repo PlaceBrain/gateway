@@ -16,6 +16,13 @@
 ## Обработка ошибок
 
 - Централизованные exception handlers для gRPC-ошибок — **не дублировать try/except в контроллерах**
+- При добавлении нового gRPC StatusCode в сервисах — **обязательно добавить маппинг** в `src/api/exception_handlers.py`
+- **Cascade delete:** если cleanup-операция может упасть, возвращать `warnings: list[str]` вместо молчаливого `success: True`
+
+## Enum-маппинги
+
+- Все маппинги proto enum ↔ HTTP string хранятся в **`src/api/enums.py`** — не дублировать в контроллерах
+- Для преобразования string → proto enum использовать `resolve_enum()` из `src/api/enums.py` — **никогда** не использовать `.get(value, default)` с тихим fallback на дефолт
 
 ## Прочее
 
