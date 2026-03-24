@@ -41,6 +41,7 @@ from placebrain_contracts.places_pb2 import (
 )
 from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
 
+from src.api.enums import ROLE_MAP, ROLE_REVERSE, resolve_enum
 from src.dependencies.auth import AuthenticatedUser
 
 from .schemas import (
@@ -61,9 +62,6 @@ from .schemas import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/places", tags=["places"], route_class=DishkaRoute)
-
-_ROLE_MAP = {0: "unspecified", 1: "owner", 2: "admin", 3: "viewer"}
-_ROLE_REVERSE = {"owner": 1, "admin": 2, "viewer": 3}
 
 
 @router.post("", response_model=CreatePlaceResponse)
@@ -94,7 +92,7 @@ async def list_places(
                 place_id=p.place_id,
                 name=p.name,
                 description=p.description,
-                user_role=_ROLE_MAP.get(p.user_role, "unspecified"),
+                user_role=ROLE_MAP.get(p.user_role, "unspecified"),
             )
             for p in response.places
         ]
@@ -114,7 +112,7 @@ async def get_place(
         place_id=response.place_id,
         name=response.name,
         description=response.description,
-        user_role=_ROLE_MAP.get(response.user_role, "unspecified"),
+        user_role=ROLE_MAP.get(response.user_role, "unspecified"),
     )
 
 
@@ -145,6 +143,7 @@ async def delete_place(
     current_user: AuthenticatedUser,
 ):
     await stub.DeletePlace(GrpcDeletePlaceRequest(user_id=current_user.user_id, place_id=place_id))
+    warnings: list[str] = []
     try:
         response = await devices_stub.DeleteDevicesByPlace(
             GrpcDeleteDevicesByPlaceRequest(place_id=place_id)
@@ -156,9 +155,11 @@ async def delete_place(
                 )
             except grpc.aio.AioRpcError:
                 logger.warning("Failed to cleanup readings for place %s", place_id)
+                warnings.append("Failed to cleanup telemetry readings")
     except grpc.aio.AioRpcError:
         logger.warning("Failed to cleanup devices for place %s", place_id)
-    return DeletePlaceResponse(success=True)
+        warnings.append("Failed to cleanup devices and their readings")
+    return DeletePlaceResponse(success=True, warnings=warnings)
 
 
 @router.post("/{place_id}/members", response_model=SuccessResponse)
@@ -175,7 +176,7 @@ async def add_member(
             user_id=current_user.user_id,
             place_id=place_id,
             target_user_id=user_response.user_id,
-            role=_ROLE_REVERSE.get(body.role, 0),
+            role=resolve_enum(ROLE_REVERSE, body.role, "role"),
         )
     )
     return SuccessResponse(success=response.success)
@@ -211,7 +212,7 @@ async def update_member_role(
             user_id=current_user.user_id,
             place_id=place_id,
             target_user_id=user_id,
-            role=_ROLE_REVERSE.get(body.role, 0),
+            role=resolve_enum(ROLE_REVERSE, body.role, "role"),
         )
     )
     return SuccessResponse(success=response.success)
@@ -238,7 +239,7 @@ async def list_members(
             MemberResponse(
                 user_id=m.user_id,
                 username=username_map.get(m.user_id, m.user_id),
-                role=_ROLE_MAP.get(m.role, "unspecified"),
+                role=ROLE_MAP.get(m.role, "unspecified"),
             )
             for m in response.members
         ]

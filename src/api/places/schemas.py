@@ -32,6 +32,7 @@ class UpdatePlaceResponse(BaseModel):
 
 class DeletePlaceResponse(BaseModel):
     success: bool
+    warnings: list[str] = []
 
 
 class AddMemberRequest(BaseModel):

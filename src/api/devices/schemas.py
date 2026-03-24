@@ -76,6 +76,11 @@ class SuccessResponse(BaseModel):
     success: bool
 
 
+class DeleteDeviceResponse(BaseModel):
+    success: bool
+    warnings: list[str] = []
+
+
 # --- Sensor schemas ---
 
 

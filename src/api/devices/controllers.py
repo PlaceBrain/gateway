@@ -64,6 +64,16 @@ from placebrain_contracts.devices_pb2 import (
 )
 from placebrain_contracts.devices_pb2_grpc import DevicesServiceStub
 
+from src.api.enums import (
+    SEVERITY_MAP,
+    SEVERITY_REVERSE,
+    STATUS_MAP,
+    THRESHOLD_TYPE_MAP,
+    THRESHOLD_TYPE_REVERSE,
+    VALUE_TYPE_MAP,
+    VALUE_TYPE_REVERSE,
+    resolve_enum,
+)
 from src.dependencies.auth import AuthenticatedUser
 
 from .schemas import (
@@ -75,6 +85,7 @@ from .schemas import (
     CreateDeviceResponse,
     CreateSensorRequest,
     CreateSensorResponse,
+    DeleteDeviceResponse,
     DeviceDetailResponse,
     DeviceListResponse,
     DeviceSummaryResponse,
@@ -100,14 +111,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/places/{place_id}/devices", tags=["devices"], route_class=DishkaRoute)
 mqtt_router = APIRouter(prefix="/mqtt", tags=["mqtt"], route_class=DishkaRoute)
-
-_STATUS_MAP = {0: "unspecified", 1: "online", 2: "offline"}
-_VALUE_TYPE_MAP = {0: "unspecified", 1: "number", 2: "boolean", 3: "enum"}
-_VALUE_TYPE_REVERSE = {"number": 1, "boolean": 2, "enum": 3}
-_THRESHOLD_TYPE_MAP = {0: "unspecified", 1: "min", 2: "max"}
-_THRESHOLD_TYPE_REVERSE = {"min": 1, "max": 2}
-_SEVERITY_MAP = {0: "unspecified", 1: "warning", 2: "critical"}
-_SEVERITY_REVERSE = {"warning": 1, "critical": 2}
 
 
 # --- Devices ---
@@ -141,7 +144,7 @@ async def list_devices(
                 device_id=d.device_id,
                 place_id=d.place_id,
                 name=d.name,
-                status=_STATUS_MAP.get(d.status, "unspecified"),
+                status=STATUS_MAP.get(d.status, "unspecified"),
                 last_seen_at=d.last_seen_at,
             )
             for d in response.devices
@@ -164,7 +167,7 @@ async def get_device(
         device_id=d.device_id,
         place_id=d.place_id,
         name=d.name,
-        status=_STATUS_MAP.get(d.status, "unspecified"),
+        status=STATUS_MAP.get(d.status, "unspecified"),
         last_seen_at=d.last_seen_at,
         created_at=d.created_at,
         updated_at=d.updated_at,
@@ -174,7 +177,7 @@ async def get_device(
                 device_id=s.device_id,
                 key=s.key,
                 name=s.name,
-                value_type=_VALUE_TYPE_MAP.get(s.value_type, "unspecified"),
+                value_type=VALUE_TYPE_MAP.get(s.value_type, "unspecified"),
                 unit_label=s.unit_label,
                 precision=s.precision,
             )
@@ -186,7 +189,7 @@ async def get_device(
                 device_id=a.device_id,
                 key=a.key,
                 name=a.name,
-                value_type=_VALUE_TYPE_MAP.get(a.value_type, "unspecified"),
+                value_type=VALUE_TYPE_MAP.get(a.value_type, "unspecified"),
                 unit_label=a.unit_label,
                 precision=a.precision,
                 min_value=a.min_value,
@@ -218,7 +221,7 @@ async def update_device(
     return UpdateDeviceResponse(device_id=response.device_id)
 
 
-@router.delete("/{device_id}", response_model=SuccessResponse)
+@router.delete("/{device_id}", response_model=DeleteDeviceResponse)
 async def delete_device(
     place_id: str,
     device_id: str,
@@ -231,11 +234,13 @@ async def delete_device(
             user_id=current_user.user_id, place_id=place_id, device_id=device_id
         )
     )
+    warnings: list[str] = []
     try:
         await collector_stub.DeleteReadings(DeleteReadingsRequest(device_ids=[device_id]))
     except grpc.aio.AioRpcError:
         logger.warning("Failed to cleanup readings for device %s", device_id)
-    return SuccessResponse(success=response.success)
+        warnings.append("Failed to cleanup telemetry readings")
+    return DeleteDeviceResponse(success=response.success, warnings=warnings)
 
 
 @router.post("/{device_id}/regenerate-token", response_model=RegenerateTokenResponse)
@@ -271,7 +276,7 @@ async def create_sensor(
             device_id=device_id,
             key=body.key,
             name=body.name,
-            value_type=_VALUE_TYPE_REVERSE.get(body.value_type, 1),
+            value_type=resolve_enum(VALUE_TYPE_REVERSE, body.value_type, "value_type"),
             unit_label=body.unit_label,
             precision=body.precision,
         )
@@ -296,7 +301,7 @@ async def list_sensors(
                 device_id=s.device_id,
                 key=s.key,
                 name=s.name,
-                value_type=_VALUE_TYPE_MAP.get(s.value_type, "unspecified"),
+                value_type=VALUE_TYPE_MAP.get(s.value_type, "unspecified"),
                 unit_label=s.unit_label,
                 precision=s.precision,
             )
@@ -365,9 +370,9 @@ async def set_threshold(
             place_id=place_id,
             device_id=device_id,
             sensor_id=sensor_id,
-            type=_THRESHOLD_TYPE_REVERSE.get(body.type, 1),
+            type=resolve_enum(THRESHOLD_TYPE_REVERSE, body.type, "type"),
             value=body.value,
-            severity=_SEVERITY_REVERSE.get(body.severity, 1),
+            severity=resolve_enum(SEVERITY_REVERSE, body.severity, "severity"),
         )
     )
     return SetThresholdResponse(threshold_id=response.threshold_id)
@@ -394,9 +399,9 @@ async def list_thresholds(
             ThresholdResponse(
                 threshold_id=t.threshold_id,
                 sensor_id=t.sensor_id,
-                type=_THRESHOLD_TYPE_MAP.get(t.type, "unspecified"),
+                type=THRESHOLD_TYPE_MAP.get(t.type, "unspecified"),
                 value=t.value,
-                severity=_SEVERITY_MAP.get(t.severity, "unspecified"),
+                severity=SEVERITY_MAP.get(t.severity, "unspecified"),
             )
             for t in response.thresholds
         ]
@@ -444,12 +449,12 @@ async def create_actuator(
             device_id=device_id,
             key=body.key,
             name=body.name,
-            value_type=_VALUE_TYPE_REVERSE.get(body.value_type, 1),
+            value_type=resolve_enum(VALUE_TYPE_REVERSE, body.value_type, "value_type"),
             unit_label=body.unit_label,
             precision=body.precision,
-            min_value=body.min_value or 0,
-            max_value=body.max_value or 0,
-            step=body.step or 0,
+            min_value=body.min_value if body.min_value is not None else 0,
+            max_value=body.max_value if body.max_value is not None else 0,
+            step=body.step if body.step is not None else 0,
             enum_options=body.enum_options or [],
         )
     )
@@ -475,7 +480,7 @@ async def list_actuators(
                 device_id=a.device_id,
                 key=a.key,
                 name=a.name,
-                value_type=_VALUE_TYPE_MAP.get(a.value_type, "unspecified"),
+                value_type=VALUE_TYPE_MAP.get(a.value_type, "unspecified"),
                 unit_label=a.unit_label,
                 precision=a.precision,
                 min_value=a.min_value,
@@ -506,9 +511,9 @@ async def update_actuator(
             name=body.name,
             unit_label=body.unit_label,
             precision=body.precision,
-            min_value=body.min_value or 0,
-            max_value=body.max_value or 0,
-            step=body.step or 0,
+            min_value=body.min_value if body.min_value is not None else 0,
+            max_value=body.max_value if body.max_value is not None else 0,
+            step=body.step if body.step is not None else 0,
             enum_options=body.enum_options or [],
         )
     )

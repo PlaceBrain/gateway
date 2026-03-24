@@ -13,6 +13,9 @@ _GRPC_TO_HTTP_STATUS: dict[grpc.StatusCode, int] = {
     grpc.StatusCode.PERMISSION_DENIED: 403,
     grpc.StatusCode.INVALID_ARGUMENT: 422,
     grpc.StatusCode.UNAVAILABLE: 503,
+    grpc.StatusCode.RESOURCE_EXHAUSTED: 429,
+    grpc.StatusCode.DEADLINE_EXCEEDED: 504,
+    grpc.StatusCode.FAILED_PRECONDITION: 400,
 }
 
 
