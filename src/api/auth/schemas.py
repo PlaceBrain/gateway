@@ -38,3 +38,20 @@ class UserResponse(BaseModel):
     username: str
     email: str
     is_verified: bool
+
+
+class SendOtpRequest(BaseModel):
+    email: str
+
+
+class SendOtpResponse(BaseModel):
+    success: bool
+
+
+class VerifyOtpRequest(BaseModel):
+    email: str
+    code: str
+
+
+class VerifyOtpResponse(BaseModel):
+    success: bool
