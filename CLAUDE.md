@@ -24,6 +24,16 @@
 - Все маппинги proto enum ↔ HTTP string хранятся в **`src/api/enums.py`** — не дублировать в контроллерах
 - Для преобразования string → proto enum использовать `resolve_enum()` из `src/api/enums.py` — **никогда** не использовать `.get(value, default)` с тихим fallback на дефолт
 
+## MQTT credentials инвалидация
+
+- При мутациях, меняющих состав локаций, gateway вызывает `devices.InvalidateMqttCredentials(user_ids)` для сброса кэша Redis
+- **create_place** → инвалидировать `current_user`
+- **delete_place** → получить `ListMembers` **до** удаления, инвалидировать всех участников
+- **add_member** → инвалидировать `target_user`
+- **remove_member** → инвалидировать `target_user`
+- **update_member_role** — инвалидация **не нужна** (роль не влияет на `allowed_place_ids`)
+- Инвалидация — fire-and-forget: ошибка логируется, но не ломает ответ
+
 ## Прочее
 
 - Ответы: ORJSON для сериализации
