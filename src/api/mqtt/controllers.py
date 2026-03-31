@@ -15,7 +15,12 @@ from .schemas import MqttAclRequest, MqttAuthRequest
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/internal/mqtt", tags=["mqtt-internal"], route_class=DishkaRoute)
+router = APIRouter(
+    prefix="/internal/mqtt",
+    tags=["mqtt-internal"],
+    route_class=DishkaRoute,
+    include_in_schema=False,
+)
 
 
 @router.post("/auth")

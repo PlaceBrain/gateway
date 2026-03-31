@@ -1,4 +1,9 @@
+from datetime import datetime
+from uuid import UUID
+
 from pydantic import BaseModel
+
+from src.api.enums import DeviceStatus, ThresholdSeverity, ThresholdType, ValueType
 
 # --- Device schemas ---
 
@@ -8,38 +13,34 @@ class CreateDeviceRequest(BaseModel):
 
 
 class CreateDeviceResponse(BaseModel):
-    device_id: str
+    device_id: UUID
     token: str
 
 
 class DeviceSummaryResponse(BaseModel):
-    device_id: str
-    place_id: str
+    device_id: UUID
+    place_id: UUID
     name: str
-    status: str
-    last_seen_at: str
-
-
-class DeviceListResponse(BaseModel):
-    devices: list[DeviceSummaryResponse]
+    status: DeviceStatus
+    last_seen_at: datetime | None
 
 
 class SensorResponse(BaseModel):
-    sensor_id: str
-    device_id: str
+    sensor_id: UUID
+    device_id: UUID
     key: str
     name: str
-    value_type: str
+    value_type: ValueType
     unit_label: str
     precision: int
 
 
 class ActuatorResponse(BaseModel):
-    actuator_id: str
-    device_id: str
+    actuator_id: UUID
+    device_id: UUID
     key: str
     name: str
-    value_type: str
+    value_type: ValueType
     unit_label: str
     precision: int
     min_value: float
@@ -49,13 +50,13 @@ class ActuatorResponse(BaseModel):
 
 
 class DeviceDetailResponse(BaseModel):
-    device_id: str
-    place_id: str
+    device_id: UUID
+    place_id: UUID
     name: str
-    status: str
-    last_seen_at: str
-    created_at: str
-    updated_at: str
+    status: DeviceStatus
+    last_seen_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
     sensors: list[SensorResponse]
     actuators: list[ActuatorResponse]
 
@@ -65,20 +66,11 @@ class UpdateDeviceRequest(BaseModel):
 
 
 class UpdateDeviceResponse(BaseModel):
-    device_id: str
+    device_id: UUID
 
 
 class RegenerateTokenResponse(BaseModel):
     token: str
-
-
-class SuccessResponse(BaseModel):
-    success: bool
-
-
-class DeleteDeviceResponse(BaseModel):
-    success: bool
-    warnings: list[str] = []
 
 
 # --- Sensor schemas ---
@@ -87,17 +79,13 @@ class DeleteDeviceResponse(BaseModel):
 class CreateSensorRequest(BaseModel):
     key: str
     name: str
-    value_type: str = "number"
+    value_type: ValueType = ValueType.NUMBER
     unit_label: str = ""
     precision: int = 2
 
 
 class CreateSensorResponse(BaseModel):
-    sensor_id: str
-
-
-class SensorListResponse(BaseModel):
-    sensors: list[SensorResponse]
+    sensor_id: UUID
 
 
 class UpdateSensorRequest(BaseModel):
@@ -107,28 +95,32 @@ class UpdateSensorRequest(BaseModel):
 
 
 class UpdateSensorResponse(BaseModel):
-    sensor_id: str
+    sensor_id: UUID
+
+
+class SensorListResponse(BaseModel):
+    sensors: list[SensorResponse]
 
 
 # --- Threshold schemas ---
 
 
 class SetThresholdRequest(BaseModel):
-    type: str
+    type: ThresholdType
     value: float
-    severity: str = "warning"
+    severity: ThresholdSeverity = ThresholdSeverity.WARNING
 
 
 class SetThresholdResponse(BaseModel):
-    threshold_id: str
+    threshold_id: UUID
 
 
 class ThresholdResponse(BaseModel):
-    threshold_id: str
-    sensor_id: str
-    type: str
+    threshold_id: UUID
+    sensor_id: UUID
+    type: ThresholdType
     value: float
-    severity: str
+    severity: ThresholdSeverity
 
 
 class ThresholdListResponse(BaseModel):
@@ -141,7 +133,7 @@ class ThresholdListResponse(BaseModel):
 class CreateActuatorRequest(BaseModel):
     key: str
     name: str
-    value_type: str = "number"
+    value_type: ValueType = ValueType.NUMBER
     unit_label: str = ""
     precision: int = 2
     min_value: float | None = None
@@ -151,11 +143,7 @@ class CreateActuatorRequest(BaseModel):
 
 
 class CreateActuatorResponse(BaseModel):
-    actuator_id: str
-
-
-class ActuatorListResponse(BaseModel):
-    actuators: list[ActuatorResponse]
+    actuator_id: UUID
 
 
 class UpdateActuatorRequest(BaseModel):
@@ -169,7 +157,11 @@ class UpdateActuatorRequest(BaseModel):
 
 
 class UpdateActuatorResponse(BaseModel):
-    actuator_id: str
+    actuator_id: UUID
+
+
+class ActuatorListResponse(BaseModel):
+    actuators: list[ActuatorResponse]
 
 
 # --- Command schemas ---

@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pydantic import BaseModel
 
 
@@ -8,12 +10,7 @@ class RegisterRequest(BaseModel):
 
 
 class RegisterResponse(BaseModel):
-    user_id: str
-
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
+    user_id: UUID
 
 
 class TokenResponse(BaseModel):
@@ -29,12 +26,8 @@ class LogoutRequest(BaseModel):
     refresh_token: str
 
 
-class LogoutResponse(BaseModel):
-    success: bool
-
-
 class UserResponse(BaseModel):
-    user_id: str
+    user_id: UUID
     username: str
     email: str
     is_verified: bool
@@ -44,14 +37,6 @@ class SendOtpRequest(BaseModel):
     email: str
 
 
-class SendOtpResponse(BaseModel):
-    success: bool
-
-
 class VerifyOtpRequest(BaseModel):
     email: str
     code: str
-
-
-class VerifyOtpResponse(BaseModel):
-    success: bool

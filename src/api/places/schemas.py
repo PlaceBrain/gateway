@@ -1,4 +1,8 @@
+from uuid import UUID
+
 from pydantic import BaseModel
+
+from src.api.enums import PlaceRole
 
 
 class CreatePlaceRequest(BaseModel):
@@ -7,14 +11,14 @@ class CreatePlaceRequest(BaseModel):
 
 
 class CreatePlaceResponse(BaseModel):
-    place_id: str
+    place_id: UUID
 
 
 class PlaceResponse(BaseModel):
-    place_id: str
+    place_id: UUID
     name: str
     description: str
-    user_role: str
+    user_role: PlaceRole
 
 
 class PlaceListResponse(BaseModel):
@@ -27,32 +31,23 @@ class UpdatePlaceRequest(BaseModel):
 
 
 class UpdatePlaceResponse(BaseModel):
-    place_id: str
-
-
-class DeletePlaceResponse(BaseModel):
-    success: bool
-    warnings: list[str] = []
+    place_id: UUID
 
 
 class AddMemberRequest(BaseModel):
     email: str
-    role: str
+    role: PlaceRole
 
 
 class MemberResponse(BaseModel):
-    user_id: str
+    user_id: UUID
     username: str
-    role: str
+    role: PlaceRole
 
 
 class MemberListResponse(BaseModel):
     members: list[MemberResponse]
 
 
-class SuccessResponse(BaseModel):
-    success: bool
-
-
 class UpdateMemberRoleRequest(BaseModel):
-    role: str
+    role: PlaceRole

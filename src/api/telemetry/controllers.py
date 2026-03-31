@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from uuid import UUID
 
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, Query
@@ -12,6 +13,7 @@ from placebrain_contracts.devices_pb2 import GetDeviceRequest as GrpcGetDeviceRe
 from placebrain_contracts.devices_pb2_grpc import DevicesServiceStub
 
 from src.dependencies.auth import AuthenticatedUser
+from src.schemas.base import AUTH_ERRORS, FORBIDDEN_ERRORS, NOT_FOUND_ERRORS
 
 from .schemas import (
     AggregatedPoint,
@@ -29,27 +31,35 @@ router = APIRouter(
 )
 
 
-@router.get("/latest", response_model=LatestReadingsResponse)
+@router.get(
+    "/latest",
+    response_model=LatestReadingsResponse,
+    responses={**AUTH_ERRORS, **FORBIDDEN_ERRORS, **NOT_FOUND_ERRORS},
+)
 async def get_latest_readings(
-    place_id: str,
-    device_id: str,
+    place_id: UUID,
+    device_id: UUID,
     devices_stub: FromDishka[DevicesServiceStub],
     collector_stub: FromDishka[CollectorServiceStub],
     current_user: AuthenticatedUser,
 ):
     # Access check: verifies user has role in place and device belongs to place
     await devices_stub.GetDevice(
-        GrpcGetDeviceRequest(user_id=current_user.user_id, place_id=place_id, device_id=device_id)
+        GrpcGetDeviceRequest(
+            user_id=current_user.user_id, place_id=str(place_id), device_id=str(device_id)
+        )
     )
 
-    response = await collector_stub.GetLatestReadings(GetLatestReadingsRequest(device_id=device_id))
+    response = await collector_stub.GetLatestReadings(
+        GetLatestReadingsRequest(device_id=str(device_id))
+    )
 
     return LatestReadingsResponse(
         readings=[
             SensorReadingResponse(
                 key=r.key,
                 value=r.value,
-                time=r.time.ToDatetime(tzinfo=UTC).isoformat(),
+                time=r.time.ToDatetime(tzinfo=UTC),
             )
             for r in response.readings
         ]
@@ -63,23 +73,39 @@ def _iso_to_proto_ts(iso: str) -> Timestamp:
     return ts
 
 
-@router.get("/history", response_model=ReadingsHistoryResponse)
+@router.get(
+    "/history",
+    response_model=ReadingsHistoryResponse,
+    responses={**AUTH_ERRORS, **FORBIDDEN_ERRORS, **NOT_FOUND_ERRORS},
+)
 async def get_readings_history(
-    place_id: str,
-    device_id: str,
+    place_id: UUID,
+    device_id: UUID,
     devices_stub: FromDishka[DevicesServiceStub],
     collector_stub: FromDishka[CollectorServiceStub],
     current_user: AuthenticatedUser,
-    time_from: str = Query(alias="from"),
-    time_to: str = Query(alias="to"),
-    interval: int = Query(default=0),
-    keys: str | None = Query(default=None),
+    time_from: str = Query(
+        alias="from",
+        description="Start time in ISO 8601 format (e.g. 2024-01-01T00:00:00Z)",
+    ),
+    time_to: str = Query(
+        alias="to",
+        description="End time in ISO 8601 format (e.g. 2024-01-02T00:00:00Z)",
+    ),
+    interval: int = Query(
+        default=0,
+        description="Aggregation interval in seconds. 0 = raw data without aggregation",
+    ),
+    keys: str | None = Query(
+        default=None,
+        description="Comma-separated sensor keys to filter (e.g. 'temperature,humidity')",
+    ),
 ):
     await devices_stub.GetDevice(
         GrpcGetDeviceRequest(
             user_id=current_user.user_id,
-            place_id=place_id,
-            device_id=device_id,
+            place_id=str(place_id),
+            device_id=str(device_id),
         )
     )
 
@@ -87,7 +113,7 @@ async def get_readings_history(
 
     response = await collector_stub.GetReadings(
         GetReadingsRequest(
-            device_id=device_id,
+            device_id=str(device_id),
             keys=key_list,
             interval_seconds=interval,
             **{"from": _iso_to_proto_ts(time_from)},
@@ -99,7 +125,7 @@ async def get_readings_history(
     for s in response.series:
         points = [
             AggregatedPoint(
-                time=p.time.ToDatetime(tzinfo=UTC).isoformat(),
+                time=p.time.ToDatetime(tzinfo=UTC),
                 avg=p.avg if p.HasField("avg") else None,
                 min=p.min if p.HasField("min") else None,
                 max=p.max if p.HasField("max") else None,
@@ -108,7 +134,7 @@ async def get_readings_history(
         ]
         raw_points = [
             RawPoint(
-                time=r.time.ToDatetime(tzinfo=UTC).isoformat(),
+                time=r.time.ToDatetime(tzinfo=UTC),
                 value=r.value,
             )
             for r in s.raw_points

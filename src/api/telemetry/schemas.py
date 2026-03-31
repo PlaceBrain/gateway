@@ -1,10 +1,12 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
 class SensorReadingResponse(BaseModel):
     key: str
     value: float
-    time: str
+    time: datetime
 
 
 class LatestReadingsResponse(BaseModel):
@@ -15,14 +17,14 @@ class LatestReadingsResponse(BaseModel):
 
 
 class AggregatedPoint(BaseModel):
-    time: str
+    time: datetime
     avg: float | None = None
     min: float | None = None
     max: float | None = None
 
 
 class RawPoint(BaseModel):
-    time: str
+    time: datetime
     value: float
 
 

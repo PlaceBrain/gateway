@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from uuid import UUID
 
 import grpc
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
@@ -44,19 +45,25 @@ from placebrain_contracts.places_pb2 import (
 )
 from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
 
-from src.api.enums import ROLE_MAP, ROLE_REVERSE, resolve_enum
+from src.api.enums import ROLE_FROM_PROTO, ROLE_TO_PROTO
 from src.dependencies.auth import AuthenticatedUser
+from src.schemas.base import (
+    AUTH_ERRORS,
+    CONFLICT_ERRORS,
+    FORBIDDEN_ERRORS,
+    NOT_FOUND_ERRORS,
+    DeleteResponse,
+    SuccessResponse,
+)
 
 from .schemas import (
     AddMemberRequest,
     CreatePlaceRequest,
     CreatePlaceResponse,
-    DeletePlaceResponse,
     MemberListResponse,
     MemberResponse,
     PlaceListResponse,
     PlaceResponse,
-    SuccessResponse,
     UpdateMemberRoleRequest,
     UpdatePlaceRequest,
     UpdatePlaceResponse,
@@ -67,7 +74,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/places", tags=["places"], route_class=DishkaRoute)
 
 
-@router.post("", response_model=CreatePlaceResponse)
+@router.post(
+    "",
+    status_code=201,
+    response_model=CreatePlaceResponse,
+    responses={**AUTH_ERRORS, **CONFLICT_ERRORS},
+)
 async def create_place(
     body: CreatePlaceRequest,
     stub: FromDishka[PlacesServiceStub],
@@ -90,7 +102,11 @@ async def create_place(
     return CreatePlaceResponse(place_id=response.place_id)
 
 
-@router.get("", response_model=PlaceListResponse)
+@router.get(
+    "",
+    response_model=PlaceListResponse,
+    responses={**AUTH_ERRORS},
+)
 async def list_places(
     stub: FromDishka[PlacesServiceStub],
     current_user: AuthenticatedUser,
@@ -102,33 +118,41 @@ async def list_places(
                 place_id=p.place_id,
                 name=p.name,
                 description=p.description,
-                user_role=ROLE_MAP.get(p.user_role, "unspecified"),
+                user_role=ROLE_FROM_PROTO.get(p.user_role, "owner"),
             )
             for p in response.places
         ]
     )
 
 
-@router.get("/{place_id}", response_model=PlaceResponse)
+@router.get(
+    "/{place_id}",
+    response_model=PlaceResponse,
+    responses={**AUTH_ERRORS, **FORBIDDEN_ERRORS, **NOT_FOUND_ERRORS},
+)
 async def get_place(
-    place_id: str,
+    place_id: UUID,
     stub: FromDishka[PlacesServiceStub],
     current_user: AuthenticatedUser,
 ):
     response = await stub.GetPlace(
-        GrpcGetPlaceRequest(user_id=current_user.user_id, place_id=place_id)
+        GrpcGetPlaceRequest(user_id=current_user.user_id, place_id=str(place_id))
     )
     return PlaceResponse(
         place_id=response.place_id,
         name=response.name,
         description=response.description,
-        user_role=ROLE_MAP.get(response.user_role, "unspecified"),
+        user_role=ROLE_FROM_PROTO.get(response.user_role, "owner"),
     )
 
 
-@router.put("/{place_id}", response_model=UpdatePlaceResponse)
+@router.put(
+    "/{place_id}",
+    response_model=UpdatePlaceResponse,
+    responses={**AUTH_ERRORS, **FORBIDDEN_ERRORS, **NOT_FOUND_ERRORS},
+)
 async def update_place(
-    place_id: str,
+    place_id: UUID,
     body: UpdatePlaceRequest,
     stub: FromDishka[PlacesServiceStub],
     current_user: AuthenticatedUser,
@@ -136,7 +160,7 @@ async def update_place(
     response = await stub.UpdatePlace(
         GrpcUpdatePlaceRequest(
             user_id=current_user.user_id,
-            place_id=place_id,
+            place_id=str(place_id),
             name=body.name,
             description=body.description,
         )
@@ -144,24 +168,30 @@ async def update_place(
     return UpdatePlaceResponse(place_id=response.place_id)
 
 
-@router.delete("/{place_id}", response_model=DeletePlaceResponse)
+@router.delete(
+    "/{place_id}",
+    response_model=DeleteResponse,
+    responses={**AUTH_ERRORS, **FORBIDDEN_ERRORS, **NOT_FOUND_ERRORS},
+)
 async def delete_place(
-    place_id: str,
+    place_id: UUID,
     stub: FromDishka[PlacesServiceStub],
     devices_stub: FromDishka[DevicesServiceStub],
     collector_stub: FromDishka[CollectorServiceStub],
     current_user: AuthenticatedUser,
 ):
     members_response = await stub.ListMembers(
-        GrpcListMembersRequest(user_id=current_user.user_id, place_id=place_id)
+        GrpcListMembersRequest(user_id=current_user.user_id, place_id=str(place_id))
     )
     member_user_ids = [m.user_id for m in members_response.members]
 
-    await stub.DeletePlace(GrpcDeletePlaceRequest(user_id=current_user.user_id, place_id=place_id))
+    await stub.DeletePlace(
+        GrpcDeletePlaceRequest(user_id=current_user.user_id, place_id=str(place_id))
+    )
     warnings: list[str] = []
     try:
         response = await devices_stub.DeleteDevicesByPlace(
-            GrpcDeleteDevicesByPlaceRequest(place_id=place_id)
+            GrpcDeleteDevicesByPlaceRequest(place_id=str(place_id))
         )
         if response.device_ids:
             try:
@@ -182,12 +212,16 @@ async def delete_place(
         except grpc.aio.AioRpcError:
             logger.warning("Failed to invalidate MQTT credentials for place %s members", place_id)
             warnings.append("Failed to invalidate MQTT credentials")
-    return DeletePlaceResponse(success=True, warnings=warnings)
+    return DeleteResponse(success=True, warnings=warnings)
 
 
-@router.post("/{place_id}/members", response_model=SuccessResponse)
+@router.post(
+    "/{place_id}/members",
+    response_model=SuccessResponse,
+    responses={**AUTH_ERRORS, **FORBIDDEN_ERRORS, **NOT_FOUND_ERRORS, **CONFLICT_ERRORS},
+)
 async def add_member(
-    place_id: str,
+    place_id: UUID,
     body: AddMemberRequest,
     stub: FromDishka[PlacesServiceStub],
     auth_stub: FromDishka[AuthServiceStub],
@@ -198,9 +232,9 @@ async def add_member(
     response = await stub.AddMember(
         GrpcAddMemberRequest(
             user_id=current_user.user_id,
-            place_id=place_id,
+            place_id=str(place_id),
             target_user_id=user_response.user_id,
-            role=resolve_enum(ROLE_REVERSE, body.role, "role"),
+            role=ROLE_TO_PROTO[body.role],
         )
     )
     try:
@@ -212,10 +246,14 @@ async def add_member(
     return SuccessResponse(success=response.success)
 
 
-@router.delete("/{place_id}/members/{user_id}", response_model=SuccessResponse)
+@router.delete(
+    "/{place_id}/members/{user_id}",
+    response_model=SuccessResponse,
+    responses={**AUTH_ERRORS, **FORBIDDEN_ERRORS, **NOT_FOUND_ERRORS},
+)
 async def remove_member(
-    place_id: str,
-    user_id: str,
+    place_id: UUID,
+    user_id: UUID,
     stub: FromDishka[PlacesServiceStub],
     devices_stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
@@ -223,23 +261,27 @@ async def remove_member(
     response = await stub.RemoveMember(
         GrpcRemoveMemberRequest(
             user_id=current_user.user_id,
-            place_id=place_id,
-            target_user_id=user_id,
+            place_id=str(place_id),
+            target_user_id=str(user_id),
         )
     )
     try:
         await devices_stub.InvalidateMqttCredentials(
-            GrpcInvalidateMqttCredentialsRequest(user_ids=[user_id])
+            GrpcInvalidateMqttCredentialsRequest(user_ids=[str(user_id)])
         )
     except grpc.aio.AioRpcError:
         logger.warning("Failed to invalidate MQTT credentials for user %s", user_id)
     return SuccessResponse(success=response.success)
 
 
-@router.put("/{place_id}/members/{user_id}", response_model=SuccessResponse)
+@router.put(
+    "/{place_id}/members/{user_id}",
+    response_model=SuccessResponse,
+    responses={**AUTH_ERRORS, **FORBIDDEN_ERRORS, **NOT_FOUND_ERRORS},
+)
 async def update_member_role(
-    place_id: str,
-    user_id: str,
+    place_id: UUID,
+    user_id: UUID,
     body: UpdateMemberRoleRequest,
     stub: FromDishka[PlacesServiceStub],
     current_user: AuthenticatedUser,
@@ -247,23 +289,27 @@ async def update_member_role(
     response = await stub.UpdateMemberRole(
         GrpcUpdateMemberRoleRequest(
             user_id=current_user.user_id,
-            place_id=place_id,
-            target_user_id=user_id,
-            role=resolve_enum(ROLE_REVERSE, body.role, "role"),
+            place_id=str(place_id),
+            target_user_id=str(user_id),
+            role=ROLE_TO_PROTO[body.role],
         )
     )
     return SuccessResponse(success=response.success)
 
 
-@router.get("/{place_id}/members", response_model=MemberListResponse)
+@router.get(
+    "/{place_id}/members",
+    response_model=MemberListResponse,
+    responses={**AUTH_ERRORS, **FORBIDDEN_ERRORS, **NOT_FOUND_ERRORS},
+)
 async def list_members(
-    place_id: str,
+    place_id: UUID,
     stub: FromDishka[PlacesServiceStub],
     auth_stub: FromDishka[AuthServiceStub],
     current_user: AuthenticatedUser,
 ):
     response = await stub.ListMembers(
-        GrpcListMembersRequest(user_id=current_user.user_id, place_id=place_id)
+        GrpcListMembersRequest(user_id=current_user.user_id, place_id=str(place_id))
     )
 
     user_infos = await asyncio.gather(
@@ -276,7 +322,7 @@ async def list_members(
             MemberResponse(
                 user_id=m.user_id,
                 username=username_map.get(m.user_id, m.user_id),
-                role=ROLE_MAP.get(m.role, "unspecified"),
+                role=ROLE_FROM_PROTO.get(m.role, "owner"),
             )
             for m in response.members
         ]

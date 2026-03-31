@@ -33,7 +33,12 @@ async def lifespan(app: FastAPI):
         await container.close()
 
 
-app = FastAPI(lifespan=lifespan, default_response_class=ORJSONResponse)
+app = FastAPI(
+    title="PlaceBrain API",
+    version="1.0.0",
+    lifespan=lifespan,
+    default_response_class=ORJSONResponse,
+)
 register_exception_handlers(app)
 app.include_router(api_router)
 setup_dishka(container, app)
