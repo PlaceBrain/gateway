@@ -5,44 +5,13 @@ from uuid import UUID
 import grpc
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter
-from placebrain_contracts.auth_pb2 import GetMeRequest, GetUserByEmailRequest
+from placebrain_contracts import auth_pb2 as auth_pb
+from placebrain_contracts import collector_pb2 as collector_pb
+from placebrain_contracts import devices_pb2 as devices_pb
+from placebrain_contracts import places_pb2 as places_pb
 from placebrain_contracts.auth_pb2_grpc import AuthServiceStub
-from placebrain_contracts.collector_pb2 import DeleteReadingsRequest
 from placebrain_contracts.collector_pb2_grpc import CollectorServiceStub
-from placebrain_contracts.devices_pb2 import (
-    DeleteDevicesByPlaceRequest as GrpcDeleteDevicesByPlaceRequest,
-)
-from placebrain_contracts.devices_pb2 import (
-    InvalidateMqttCredentialsRequest as GrpcInvalidateMqttCredentialsRequest,
-)
 from placebrain_contracts.devices_pb2_grpc import DevicesServiceStub
-from placebrain_contracts.places_pb2 import (
-    AddMemberRequest as GrpcAddMemberRequest,
-)
-from placebrain_contracts.places_pb2 import (
-    CreatePlaceRequest as GrpcCreatePlaceRequest,
-)
-from placebrain_contracts.places_pb2 import (
-    DeletePlaceRequest as GrpcDeletePlaceRequest,
-)
-from placebrain_contracts.places_pb2 import (
-    GetPlaceRequest as GrpcGetPlaceRequest,
-)
-from placebrain_contracts.places_pb2 import (
-    ListMembersRequest as GrpcListMembersRequest,
-)
-from placebrain_contracts.places_pb2 import (
-    ListPlacesRequest as GrpcListPlacesRequest,
-)
-from placebrain_contracts.places_pb2 import (
-    RemoveMemberRequest as GrpcRemoveMemberRequest,
-)
-from placebrain_contracts.places_pb2 import (
-    UpdateMemberRoleRequest as GrpcUpdateMemberRoleRequest,
-)
-from placebrain_contracts.places_pb2 import (
-    UpdatePlaceRequest as GrpcUpdatePlaceRequest,
-)
 from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
 
 from src.api.enums import ROLE_FROM_PROTO, ROLE_TO_PROTO
@@ -87,7 +56,7 @@ async def create_place(
     current_user: AuthenticatedUser,
 ):
     response = await stub.CreatePlace(
-        GrpcCreatePlaceRequest(
+        places_pb.CreatePlaceRequest(
             user_id=current_user.user_id,
             name=body.name,
             description=body.description,
@@ -95,7 +64,7 @@ async def create_place(
     )
     try:
         await devices_stub.InvalidateMqttCredentials(
-            GrpcInvalidateMqttCredentialsRequest(user_ids=[current_user.user_id])
+            devices_pb.InvalidateMqttCredentialsRequest(user_ids=[current_user.user_id])
         )
     except grpc.aio.AioRpcError:
         logger.warning("Failed to invalidate MQTT credentials for user %s", current_user.user_id)
@@ -111,18 +80,8 @@ async def list_places(
     stub: FromDishka[PlacesServiceStub],
     current_user: AuthenticatedUser,
 ):
-    response = await stub.ListPlaces(GrpcListPlacesRequest(user_id=current_user.user_id))
-    return PlaceListResponse(
-        places=[
-            PlaceResponse(
-                place_id=p.place_id,
-                name=p.name,
-                description=p.description,
-                user_role=ROLE_FROM_PROTO.get(p.user_role, "owner"),
-            )
-            for p in response.places
-        ]
-    )
+    response = await stub.ListPlaces(places_pb.ListPlacesRequest(user_id=current_user.user_id))
+    return PlaceListResponse(places=[PlaceResponse.from_proto(p) for p in response.places])
 
 
 @router.get(
@@ -136,14 +95,9 @@ async def get_place(
     current_user: AuthenticatedUser,
 ):
     response = await stub.GetPlace(
-        GrpcGetPlaceRequest(user_id=current_user.user_id, place_id=str(place_id))
+        places_pb.GetPlaceRequest(user_id=current_user.user_id, place_id=str(place_id))
     )
-    return PlaceResponse(
-        place_id=response.place_id,
-        name=response.name,
-        description=response.description,
-        user_role=ROLE_FROM_PROTO.get(response.user_role, "owner"),
-    )
+    return PlaceResponse.from_proto(response)
 
 
 @router.put(
@@ -158,7 +112,7 @@ async def update_place(
     current_user: AuthenticatedUser,
 ):
     response = await stub.UpdatePlace(
-        GrpcUpdatePlaceRequest(
+        places_pb.UpdatePlaceRequest(
             user_id=current_user.user_id,
             place_id=str(place_id),
             name=body.name,
@@ -181,22 +135,22 @@ async def delete_place(
     current_user: AuthenticatedUser,
 ):
     members_response = await stub.ListMembers(
-        GrpcListMembersRequest(user_id=current_user.user_id, place_id=str(place_id))
+        places_pb.ListMembersRequest(user_id=current_user.user_id, place_id=str(place_id))
     )
     member_user_ids = [m.user_id for m in members_response.members]
 
     await stub.DeletePlace(
-        GrpcDeletePlaceRequest(user_id=current_user.user_id, place_id=str(place_id))
+        places_pb.DeletePlaceRequest(user_id=current_user.user_id, place_id=str(place_id))
     )
     warnings: list[str] = []
     try:
         response = await devices_stub.DeleteDevicesByPlace(
-            GrpcDeleteDevicesByPlaceRequest(place_id=str(place_id))
+            devices_pb.DeleteDevicesByPlaceRequest(place_id=str(place_id))
         )
         if response.device_ids:
             try:
                 await collector_stub.DeleteReadings(
-                    DeleteReadingsRequest(device_ids=response.device_ids)
+                    collector_pb.DeleteReadingsRequest(device_ids=response.device_ids)
                 )
             except grpc.aio.AioRpcError:
                 logger.warning("Failed to cleanup readings for place %s", place_id)
@@ -207,7 +161,7 @@ async def delete_place(
     if member_user_ids:
         try:
             await devices_stub.InvalidateMqttCredentials(
-                GrpcInvalidateMqttCredentialsRequest(user_ids=member_user_ids)
+                devices_pb.InvalidateMqttCredentialsRequest(user_ids=member_user_ids)
             )
         except grpc.aio.AioRpcError:
             logger.warning("Failed to invalidate MQTT credentials for place %s members", place_id)
@@ -228,9 +182,9 @@ async def add_member(
     devices_stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
 ):
-    user_response = await auth_stub.GetUserByEmail(GetUserByEmailRequest(email=body.email))
+    user_response = await auth_stub.GetUserByEmail(auth_pb.GetUserByEmailRequest(email=body.email))
     response = await stub.AddMember(
-        GrpcAddMemberRequest(
+        places_pb.AddMemberRequest(
             user_id=current_user.user_id,
             place_id=str(place_id),
             target_user_id=user_response.user_id,
@@ -239,7 +193,7 @@ async def add_member(
     )
     try:
         await devices_stub.InvalidateMqttCredentials(
-            GrpcInvalidateMqttCredentialsRequest(user_ids=[user_response.user_id])
+            devices_pb.InvalidateMqttCredentialsRequest(user_ids=[user_response.user_id])
         )
     except grpc.aio.AioRpcError:
         logger.warning("Failed to invalidate MQTT credentials for user %s", user_response.user_id)
@@ -259,7 +213,7 @@ async def remove_member(
     current_user: AuthenticatedUser,
 ):
     response = await stub.RemoveMember(
-        GrpcRemoveMemberRequest(
+        places_pb.RemoveMemberRequest(
             user_id=current_user.user_id,
             place_id=str(place_id),
             target_user_id=str(user_id),
@@ -267,7 +221,7 @@ async def remove_member(
     )
     try:
         await devices_stub.InvalidateMqttCredentials(
-            GrpcInvalidateMqttCredentialsRequest(user_ids=[str(user_id)])
+            devices_pb.InvalidateMqttCredentialsRequest(user_ids=[str(user_id)])
         )
     except grpc.aio.AioRpcError:
         logger.warning("Failed to invalidate MQTT credentials for user %s", user_id)
@@ -287,7 +241,7 @@ async def update_member_role(
     current_user: AuthenticatedUser,
 ):
     response = await stub.UpdateMemberRole(
-        GrpcUpdateMemberRoleRequest(
+        places_pb.UpdateMemberRoleRequest(
             user_id=current_user.user_id,
             place_id=str(place_id),
             target_user_id=str(user_id),
@@ -309,11 +263,11 @@ async def list_members(
     current_user: AuthenticatedUser,
 ):
     response = await stub.ListMembers(
-        GrpcListMembersRequest(user_id=current_user.user_id, place_id=str(place_id))
+        places_pb.ListMembersRequest(user_id=current_user.user_id, place_id=str(place_id))
     )
 
     user_infos = await asyncio.gather(
-        *(auth_stub.GetMe(GetMeRequest(user_id=m.user_id)) for m in response.members)
+        *(auth_stub.GetMe(auth_pb.GetMeRequest(user_id=m.user_id)) for m in response.members)
     )
     username_map = {info.user_id: info.username for info in user_infos}
 

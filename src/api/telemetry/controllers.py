@@ -4,12 +4,9 @@ from uuid import UUID
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, Query
 from google.protobuf.timestamp_pb2 import Timestamp
-from placebrain_contracts.collector_pb2 import (
-    GetLatestReadingsRequest,
-    GetReadingsRequest,
-)
+from placebrain_contracts import collector_pb2 as collector_pb
+from placebrain_contracts import devices_pb2 as devices_pb
 from placebrain_contracts.collector_pb2_grpc import CollectorServiceStub
-from placebrain_contracts.devices_pb2 import GetDeviceRequest as GrpcGetDeviceRequest
 from placebrain_contracts.devices_pb2_grpc import DevicesServiceStub
 
 from src.dependencies.auth import AuthenticatedUser
@@ -43,15 +40,14 @@ async def get_latest_readings(
     collector_stub: FromDishka[CollectorServiceStub],
     current_user: AuthenticatedUser,
 ):
-    # Access check: verifies user has role in place and device belongs to place
     await devices_stub.GetDevice(
-        GrpcGetDeviceRequest(
+        devices_pb.GetDeviceRequest(
             user_id=current_user.user_id, place_id=str(place_id), device_id=str(device_id)
         )
     )
 
     response = await collector_stub.GetLatestReadings(
-        GetLatestReadingsRequest(device_id=str(device_id))
+        collector_pb.GetLatestReadingsRequest(device_id=str(device_id))
     )
 
     return LatestReadingsResponse(
@@ -102,7 +98,7 @@ async def get_readings_history(
     ),
 ):
     await devices_stub.GetDevice(
-        GrpcGetDeviceRequest(
+        devices_pb.GetDeviceRequest(
             user_id=current_user.user_id,
             place_id=str(place_id),
             device_id=str(device_id),
@@ -112,7 +108,7 @@ async def get_readings_history(
     key_list = [k.strip() for k in keys.split(",") if k.strip()] if keys else []
 
     response = await collector_stub.GetReadings(
-        GetReadingsRequest(
+        collector_pb.GetReadingsRequest(
             device_id=str(device_id),
             keys=key_list,
             interval_seconds=interval,

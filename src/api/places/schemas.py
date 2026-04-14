@@ -1,8 +1,9 @@
+from typing import Self
 from uuid import UUID
 
 from pydantic import BaseModel
 
-from src.api.enums import PlaceRole
+from src.api.enums import ROLE_FROM_PROTO, PlaceRole
 
 
 class CreatePlaceRequest(BaseModel):
@@ -19,6 +20,15 @@ class PlaceResponse(BaseModel):
     name: str
     description: str
     user_role: PlaceRole
+
+    @classmethod
+    def from_proto(cls, p) -> Self:
+        return cls(
+            place_id=p.place_id,
+            name=p.name,
+            description=p.description,
+            user_role=ROLE_FROM_PROTO.get(p.user_role, "owner"),
+        )
 
 
 class PlaceListResponse(BaseModel):
