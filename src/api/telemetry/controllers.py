@@ -39,7 +39,7 @@ async def get_latest_readings(
     devices_stub: FromDishka[DevicesServiceStub],
     collector_stub: FromDishka[CollectorServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> LatestReadingsResponse:
     await devices_stub.GetDevice(
         devices_pb.GetDeviceRequest(
             user_id=current_user.user_id, place_id=str(place_id), device_id=str(device_id)
@@ -96,7 +96,7 @@ async def get_readings_history(
         default=None,
         description="Comma-separated sensor keys to filter (e.g. 'temperature,humidity')",
     ),
-):
+) -> ReadingsHistoryResponse:
     await devices_stub.GetDevice(
         devices_pb.GetDeviceRequest(
             user_id=current_user.user_id,

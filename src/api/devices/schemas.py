@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Self
+from typing import Any, Self
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -35,12 +35,12 @@ class DeviceSummaryResponse(BaseModel):
     last_seen_at: datetime | None
 
     @classmethod
-    def from_proto(cls, d) -> Self:
+    def from_proto(cls, d: Any) -> Self:
         return cls(
             device_id=d.device_id,
             place_id=d.place_id,
             name=d.name,
-            status=STATUS_FROM_PROTO.get(d.status, "offline"),
+            status=STATUS_FROM_PROTO.get(d.status, DeviceStatus.OFFLINE),
             last_seen_at=d.last_seen_at or None,
         )
 
@@ -55,13 +55,13 @@ class SensorResponse(BaseModel):
     precision: int
 
     @classmethod
-    def from_proto(cls, s) -> Self:
+    def from_proto(cls, s: Any) -> Self:
         return cls(
             sensor_id=s.sensor_id,
             device_id=s.device_id,
             key=s.key,
             name=s.name,
-            value_type=VALUE_TYPE_FROM_PROTO.get(s.value_type, "number"),
+            value_type=VALUE_TYPE_FROM_PROTO.get(s.value_type, ValueType.NUMBER),
             unit_label=s.unit_label,
             precision=s.precision,
         )
@@ -81,13 +81,13 @@ class ActuatorResponse(BaseModel):
     enum_options: list[str]
 
     @classmethod
-    def from_proto(cls, a) -> Self:
+    def from_proto(cls, a: Any) -> Self:
         return cls(
             actuator_id=a.actuator_id,
             device_id=a.device_id,
             key=a.key,
             name=a.name,
-            value_type=VALUE_TYPE_FROM_PROTO.get(a.value_type, "number"),
+            value_type=VALUE_TYPE_FROM_PROTO.get(a.value_type, ValueType.NUMBER),
             unit_label=a.unit_label,
             precision=a.precision,
             min_value=a.min_value,
@@ -171,13 +171,13 @@ class ThresholdResponse(BaseModel):
     severity: ThresholdSeverity
 
     @classmethod
-    def from_proto(cls, t) -> Self:
+    def from_proto(cls, t: Any) -> Self:
         return cls(
             threshold_id=t.threshold_id,
             sensor_id=t.sensor_id,
-            type=THRESHOLD_TYPE_FROM_PROTO.get(t.type, "min"),
+            type=THRESHOLD_TYPE_FROM_PROTO.get(t.type, ThresholdType.MIN),
             value=t.value,
-            severity=SEVERITY_FROM_PROTO.get(t.severity, "warning"),
+            severity=SEVERITY_FROM_PROTO.get(t.severity, ThresholdSeverity.WARNING),
         )
 
 

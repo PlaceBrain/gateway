@@ -14,7 +14,7 @@ from placebrain_contracts.collector_pb2_grpc import CollectorServiceStub
 from placebrain_contracts.devices_pb2_grpc import DevicesServiceStub
 from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
 
-from src.core.enums import ROLE_FROM_PROTO, ROLE_TO_PROTO
+from src.core.enums import ROLE_FROM_PROTO, ROLE_TO_PROTO, PlaceRole
 from src.dependencies.auth import AuthenticatedUser
 from src.schemas.base import (
     AUTH_ERRORS,
@@ -54,7 +54,7 @@ async def create_place(
     stub: FromDishka[PlacesServiceStub],
     devices_stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> CreatePlaceResponse:
     response = await stub.CreatePlace(
         places_pb.CreatePlaceRequest(
             user_id=current_user.user_id,
@@ -79,7 +79,7 @@ async def create_place(
 async def list_places(
     stub: FromDishka[PlacesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> PlaceListResponse:
     response = await stub.ListPlaces(places_pb.ListPlacesRequest(user_id=current_user.user_id))
     return PlaceListResponse(places=[PlaceResponse.from_proto(p) for p in response.places])
 
@@ -93,7 +93,7 @@ async def get_place(
     place_id: UUID,
     stub: FromDishka[PlacesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> PlaceResponse:
     response = await stub.GetPlace(
         places_pb.GetPlaceRequest(user_id=current_user.user_id, place_id=str(place_id))
     )
@@ -110,7 +110,7 @@ async def update_place(
     body: UpdatePlaceRequest,
     stub: FromDishka[PlacesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> UpdatePlaceResponse:
     response = await stub.UpdatePlace(
         places_pb.UpdatePlaceRequest(
             user_id=current_user.user_id,
@@ -133,7 +133,7 @@ async def delete_place(
     devices_stub: FromDishka[DevicesServiceStub],
     collector_stub: FromDishka[CollectorServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> DeleteResponse:
     members_response = await stub.ListMembers(
         places_pb.ListMembersRequest(user_id=current_user.user_id, place_id=str(place_id))
     )
@@ -181,14 +181,14 @@ async def add_member(
     auth_stub: FromDishka[AuthServiceStub],
     devices_stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> SuccessResponse:
     user_response = await auth_stub.GetUserByEmail(auth_pb.GetUserByEmailRequest(email=body.email))
     response = await stub.AddMember(
         places_pb.AddMemberRequest(
             user_id=current_user.user_id,
             place_id=str(place_id),
             target_user_id=user_response.user_id,
-            role=ROLE_TO_PROTO[body.role],
+            role=ROLE_TO_PROTO[body.role],  # type: ignore[arg-type]
         )
     )
     try:
@@ -211,7 +211,7 @@ async def remove_member(
     stub: FromDishka[PlacesServiceStub],
     devices_stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> SuccessResponse:
     response = await stub.RemoveMember(
         places_pb.RemoveMemberRequest(
             user_id=current_user.user_id,
@@ -239,13 +239,13 @@ async def update_member_role(
     body: UpdateMemberRoleRequest,
     stub: FromDishka[PlacesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> SuccessResponse:
     response = await stub.UpdateMemberRole(
         places_pb.UpdateMemberRoleRequest(
             user_id=current_user.user_id,
             place_id=str(place_id),
             target_user_id=str(user_id),
-            role=ROLE_TO_PROTO[body.role],
+            role=ROLE_TO_PROTO[body.role],  # type: ignore[arg-type]
         )
     )
     return SuccessResponse(success=response.success)
@@ -261,7 +261,7 @@ async def list_members(
     stub: FromDishka[PlacesServiceStub],
     auth_stub: FromDishka[AuthServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> MemberListResponse:
     response = await stub.ListMembers(
         places_pb.ListMembersRequest(user_id=current_user.user_id, place_id=str(place_id))
     )
@@ -276,7 +276,7 @@ async def list_members(
             MemberResponse(
                 user_id=m.user_id,
                 username=username_map.get(m.user_id, m.user_id),
-                role=ROLE_FROM_PROTO.get(m.role, "owner"),
+                role=ROLE_FROM_PROTO.get(m.role, PlaceRole.OWNER),
             )
             for m in response.members
         ]

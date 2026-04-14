@@ -43,7 +43,7 @@ async def create_sensor(
     body: CreateSensorRequest,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> CreateSensorResponse:
     response = await stub.CreateSensor(
         devices_pb.CreateSensorRequest(
             user_id=current_user.user_id,
@@ -51,7 +51,7 @@ async def create_sensor(
             device_id=str(device_id),
             key=body.key,
             name=body.name,
-            value_type=VALUE_TYPE_TO_PROTO[body.value_type],
+            value_type=VALUE_TYPE_TO_PROTO[body.value_type],  # type: ignore[arg-type]
             unit_label=body.unit_label,
             precision=body.precision,
         )
@@ -69,7 +69,7 @@ async def list_sensors(
     device_id: UUID,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> SensorListResponse:
     response = await stub.ListSensors(
         devices_pb.ListSensorsRequest(
             user_id=current_user.user_id, place_id=str(place_id), device_id=str(device_id)
@@ -90,7 +90,7 @@ async def update_sensor(
     body: UpdateSensorRequest,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> UpdateSensorResponse:
     response = await stub.UpdateSensor(
         devices_pb.UpdateSensorRequest(
             user_id=current_user.user_id,
@@ -116,7 +116,7 @@ async def delete_sensor(
     sensor_id: UUID,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> SuccessResponse:
     response = await stub.DeleteSensor(
         devices_pb.DeleteSensorRequest(
             user_id=current_user.user_id,

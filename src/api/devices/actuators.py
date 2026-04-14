@@ -43,7 +43,7 @@ async def create_actuator(
     body: CreateActuatorRequest,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> CreateActuatorResponse:
     response = await stub.CreateActuator(
         devices_pb.CreateActuatorRequest(
             user_id=current_user.user_id,
@@ -51,7 +51,7 @@ async def create_actuator(
             device_id=str(device_id),
             key=body.key,
             name=body.name,
-            value_type=VALUE_TYPE_TO_PROTO[body.value_type],
+            value_type=VALUE_TYPE_TO_PROTO[body.value_type],  # type: ignore[arg-type]
             unit_label=body.unit_label,
             precision=body.precision,
             min_value=body.min_value if body.min_value is not None else 0,
@@ -73,7 +73,7 @@ async def list_actuators(
     device_id: UUID,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> ActuatorListResponse:
     response = await stub.ListActuators(
         devices_pb.ListActuatorsRequest(
             user_id=current_user.user_id, place_id=str(place_id), device_id=str(device_id)
@@ -96,7 +96,7 @@ async def update_actuator(
     body: UpdateActuatorRequest,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> UpdateActuatorResponse:
     response = await stub.UpdateActuator(
         devices_pb.UpdateActuatorRequest(
             user_id=current_user.user_id,
@@ -126,7 +126,7 @@ async def delete_actuator(
     actuator_id: UUID,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> SuccessResponse:
     response = await stub.DeleteActuator(
         devices_pb.DeleteActuatorRequest(
             user_id=current_user.user_id,

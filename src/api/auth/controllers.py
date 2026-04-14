@@ -29,7 +29,7 @@ router = APIRouter(prefix="/auth", tags=["auth"], route_class=DishkaRoute)
 @router.post(
     "/register", status_code=201, response_model=RegisterResponse, responses={**CONFLICT_ERRORS}
 )
-async def register(body: RegisterRequest, stub: FromDishka[AuthServiceStub]):
+async def register(body: RegisterRequest, stub: FromDishka[AuthServiceStub]) -> RegisterResponse:
     response = await stub.Register(
         auth_pb.RegisterRequest(username=body.username, email=body.email, password=body.password)
     )
@@ -44,7 +44,7 @@ async def register(body: RegisterRequest, stub: FromDishka[AuthServiceStub]):
 async def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends(OAuth2PasswordRequestForm)],
     stub: FromDishka[AuthServiceStub],
-):
+) -> TokenResponse:
     response = await stub.Login(
         auth_pb.LoginRequest(email=form_data.username, password=form_data.password)
     )
@@ -52,7 +52,7 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokenResponse, responses={**AUTH_ERRORS})
-async def refresh(body: RefreshRequest, stub: FromDishka[AuthServiceStub]):
+async def refresh(body: RefreshRequest, stub: FromDishka[AuthServiceStub]) -> TokenResponse:
     response = await stub.RefreshTokens(
         auth_pb.RefreshTokensRequest(refresh_token=body.refresh_token)
     )
@@ -60,7 +60,7 @@ async def refresh(body: RefreshRequest, stub: FromDishka[AuthServiceStub]):
 
 
 @router.post("/logout", response_model=SuccessResponse)
-async def logout(body: LogoutRequest, stub: FromDishka[AuthServiceStub]):
+async def logout(body: LogoutRequest, stub: FromDishka[AuthServiceStub]) -> SuccessResponse:
     response = await stub.Logout(auth_pb.LogoutRequest(refresh_token=body.refresh_token))
     return SuccessResponse(success=response.success)
 
@@ -69,7 +69,7 @@ async def logout(body: LogoutRequest, stub: FromDishka[AuthServiceStub]):
 async def get_me(
     stub: FromDishka[AuthServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> UserResponse:
     response = await stub.GetMe(auth_pb.GetMeRequest(user_id=current_user.user_id))
     return UserResponse(
         user_id=response.user_id,
@@ -80,12 +80,12 @@ async def get_me(
 
 
 @router.post("/send-otp", response_model=SuccessResponse)
-async def send_otp(body: SendOtpRequest, stub: FromDishka[AuthServiceStub]):
+async def send_otp(body: SendOtpRequest, stub: FromDishka[AuthServiceStub]) -> SuccessResponse:
     response = await stub.SendOtp(auth_pb.SendOtpRequest(email=body.email))
     return SuccessResponse(success=response.success)
 
 
 @router.post("/verify-otp", response_model=SuccessResponse)
-async def verify_otp(body: VerifyOtpRequest, stub: FromDishka[AuthServiceStub]):
+async def verify_otp(body: VerifyOtpRequest, stub: FromDishka[AuthServiceStub]) -> SuccessResponse:
     response = await stub.VerifyOtp(auth_pb.VerifyOtpRequest(email=body.email, code=body.code))
     return SuccessResponse(success=response.success)

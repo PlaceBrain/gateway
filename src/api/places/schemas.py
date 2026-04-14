@@ -1,4 +1,4 @@
-from typing import Self
+from typing import Any, Self
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -22,12 +22,12 @@ class PlaceResponse(BaseModel):
     user_role: PlaceRole
 
     @classmethod
-    def from_proto(cls, p) -> Self:
+    def from_proto(cls, p: Any) -> Self:
         return cls(
             place_id=p.place_id,
             name=p.name,
             description=p.description,
-            user_role=ROLE_FROM_PROTO.get(p.user_role, "owner"),
+            user_role=ROLE_FROM_PROTO.get(p.user_role, PlaceRole.OWNER),
         )
 
 

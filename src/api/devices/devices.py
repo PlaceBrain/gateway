@@ -9,7 +9,7 @@ from placebrain_contracts import devices_pb2 as devices_pb
 from placebrain_contracts.collector_pb2_grpc import CollectorServiceStub
 from placebrain_contracts.devices_pb2_grpc import DevicesServiceStub
 
-from src.core.enums import STATUS_FROM_PROTO
+from src.core.enums import STATUS_FROM_PROTO, DeviceStatus
 from src.dependencies.auth import AuthenticatedUser
 from src.schemas.base import (
     AUTH_ERRORS,
@@ -49,7 +49,7 @@ async def create_device(
     body: CreateDeviceRequest,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> CreateDeviceResponse:
     response = await stub.CreateDevice(
         devices_pb.CreateDeviceRequest(
             user_id=current_user.user_id, place_id=str(place_id), name=body.name
@@ -68,7 +68,7 @@ async def list_devices(
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
     pagination: PaginationParams,
-):
+) -> PaginatedResponse[DeviceSummaryResponse]:
     response = await stub.ListDevices(
         devices_pb.ListDevicesRequest(
             user_id=current_user.user_id,
@@ -97,7 +97,7 @@ async def get_device(
     device_id: UUID,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> DeviceDetailResponse:
     response = await stub.GetDevice(
         devices_pb.GetDeviceRequest(
             user_id=current_user.user_id, place_id=str(place_id), device_id=str(device_id)
@@ -108,7 +108,7 @@ async def get_device(
         device_id=d.device_id,
         place_id=d.place_id,
         name=d.name,
-        status=STATUS_FROM_PROTO.get(d.status, "offline"),
+        status=STATUS_FROM_PROTO.get(d.status, DeviceStatus.OFFLINE),
         last_seen_at=d.last_seen_at or None,
         created_at=d.created_at,
         updated_at=d.updated_at,
@@ -128,7 +128,7 @@ async def update_device(
     body: UpdateDeviceRequest,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> UpdateDeviceResponse:
     response = await stub.UpdateDevice(
         devices_pb.UpdateDeviceRequest(
             user_id=current_user.user_id,
@@ -151,7 +151,7 @@ async def delete_device(
     stub: FromDishka[DevicesServiceStub],
     collector_stub: FromDishka[CollectorServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> DeleteResponse:
     response = await stub.DeleteDevice(
         devices_pb.DeleteDeviceRequest(
             user_id=current_user.user_id, place_id=str(place_id), device_id=str(device_id)
@@ -178,7 +178,7 @@ async def regenerate_token(
     device_id: UUID,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> RegenerateTokenResponse:
     response = await stub.RegenerateDeviceToken(
         devices_pb.RegenerateDeviceTokenRequest(
             user_id=current_user.user_id, place_id=str(place_id), device_id=str(device_id)

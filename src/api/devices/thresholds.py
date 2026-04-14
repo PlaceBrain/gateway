@@ -42,16 +42,16 @@ async def set_threshold(
     body: SetThresholdRequest,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> SetThresholdResponse:
     response = await stub.SetThreshold(
         devices_pb.SetThresholdRequest(
             user_id=current_user.user_id,
             place_id=str(place_id),
             device_id=str(device_id),
             sensor_id=str(sensor_id),
-            type=THRESHOLD_TYPE_TO_PROTO[body.type],
+            type=THRESHOLD_TYPE_TO_PROTO[body.type],  # type: ignore[arg-type]
             value=body.value,
-            severity=SEVERITY_TO_PROTO[body.severity],
+            severity=SEVERITY_TO_PROTO[body.severity],  # type: ignore[arg-type]
         )
     )
     return SetThresholdResponse(threshold_id=response.threshold_id)
@@ -68,7 +68,7 @@ async def list_thresholds(
     sensor_id: UUID,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> ThresholdListResponse:
     response = await stub.ListThresholds(
         devices_pb.ListThresholdsRequest(
             user_id=current_user.user_id,
@@ -94,7 +94,7 @@ async def delete_threshold(
     threshold_id: UUID,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> SuccessResponse:
     response = await stub.DeleteThreshold(
         devices_pb.DeleteThresholdRequest(
             user_id=current_user.user_id,

@@ -31,7 +31,7 @@ internal_router = APIRouter(
 async def generate_mqtt_credentials(
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> MqttCredentialsResponse:
     response = await stub.GenerateMqttCredentials(
         devices_pb.GenerateMqttCredentialsRequest(user_id=current_user.user_id)
     )
@@ -46,7 +46,7 @@ async def generate_mqtt_credentials(
 async def mqtt_auth(
     body: MqttAuthRequest,
     stub: FromDishka[DevicesServiceStub],
-):
+) -> ORJSONResponse:
     response = await stub.AuthenticateDevice(
         devices_pb.AuthenticateDeviceRequest(username=body.username, password=body.password)
     )
@@ -59,7 +59,7 @@ async def mqtt_auth(
 async def mqtt_acl(
     body: MqttAclRequest,
     stub: FromDishka[DevicesServiceStub],
-):
+) -> ORJSONResponse:
     response = await stub.CheckDeviceAcl(
         devices_pb.CheckDeviceAclRequest(
             username=body.username, topic=body.topic, action=body.action
