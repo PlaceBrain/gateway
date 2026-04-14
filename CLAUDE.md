@@ -1,59 +1,59 @@
 # Gateway Service
 
-- **Порт:** 8000, **без собственной БД** — stateless proxy
-- FastAPI + Hypercorn, DI через Dishka с FastAPI-интеграцией
+- **Port:** 8000, **no own DB** — stateless proxy
+- FastAPI + Hypercorn, DI via Dishka with FastAPI integration
 - OpenAPI: `title="PlaceBrain API"`, `version="1.0.0"`
 
-## Структура
+## Structure
 
 ```
 src/core/
 ├── config.py                # Pydantic Settings
-└── enums.py                 # StrEnum + proto-маппинги (единый файл)
+└── enums.py                 # StrEnum + proto mappings (single file)
 
 src/api/
-├── __init__.py              # Сборка всех роутеров в api_router
-├── exception_handlers.py    # gRPC → HTTP маппинг ошибок
-├── utils.py                 # Генерация openapi.json
-├── auth/                    # /api/auth — регистрация, логин, JWT, OTP
-├── places/                  # /api/places — CRUD локаций и участников
+├── __init__.py              # Assembly of all routers into api_router
+├── exception_handlers.py    # gRPC → HTTP error mapping
+├── utils.py                 # OpenAPI JSON generation
+├── auth/                    # /api/auth — registration, login, JWT, OTP
+├── places/                  # /api/places — CRUD locations and members
 ├── devices/                 # /api/places/{place_id}/devices/...
-│   ├── __init__.py          # Сборка дочерних роутеров
-│   ├── devices.py           # CRUD устройств + regenerate-token
-│   ├── sensors.py           # CRUD сенсоров
-│   ├── actuators.py         # CRUD актуаторов
-│   ├── thresholds.py        # Пороги сенсоров
-│   ├── commands.py          # Отправка команд на устройства
-│   └── schemas.py           # Все Pydantic-схемы пакета (общий файл)
+│   ├── __init__.py          # Assembly of child routers
+│   ├── devices.py           # CRUD devices + regenerate-token
+│   ├── sensors.py           # CRUD sensors
+│   ├── actuators.py         # CRUD actuators
+│   ├── thresholds.py        # Sensor thresholds
+│   ├── commands.py          # Sending commands to devices
+│   └── schemas.py           # All Pydantic schemas for the package (shared file)
 ├── mqtt/                    # MQTT endpoints
 │   ├── controllers.py       # router (user-facing /api/mqtt) + internal_router (EMQX webhooks)
 │   └── schemas.py
 └── telemetry/               # /api/places/{place_id}/devices/{device_id}/telemetry
 ```
 
-**Правила организации роутов:**
-- Каждый модуль в `devices/` определяет свой `router` с полным prefix и `route_class=DishkaRoute` — route_class **не наследуется** от parent router
-- `devices/__init__.py` собирает дочерние роутеры через `include_router()`, сам имеет пустой prefix
-- MQTT: `router` — пользовательский (`/api/mqtt/credentials`), `internal_router` — EMQX-вебхуки (`/api/internal/mqtt/`, скрыт из OpenAPI)
-- `/api/internal/` закрыт Traefik'ом снаружи, доступен только из Docker-сети
+**Route organization rules:**
+- Each module in `devices/` defines its own `router` with full prefix and `route_class=DishkaRoute` — route_class is **not inherited** from the parent router
+- `devices/__init__.py` assembles child routers via `include_router()`, itself has an empty prefix
+- MQTT: `router` — user-facing (`/api/mqtt/credentials`), `internal_router` — EMQX webhooks (`/api/internal/mqtt/`, hidden from OpenAPI)
+- `/api/internal/` is blocked by Traefik externally, accessible only from the Docker network
 
-## Protobuf-импорты
+## Protobuf Imports
 
-**Импортировать proto-модули, не отдельные классы:**
+**Import proto modules, not individual classes:**
 ```python
-# Правильно:
+# Correct:
 from placebrain_contracts import devices_pb2 as devices_pb
 response = await stub.CreateDevice(devices_pb.CreateDeviceRequest(...))
 
-# Неправильно:
+# Incorrect:
 from placebrain_contracts.devices_pb2 import CreateDeviceRequest as GrpcCreateDeviceRequest
 ```
 
-Stub-классы (`DevicesServiceStub`, etc.) — единственное исключение, импортируются поштучно из `*_pb2_grpc` для Dishka type hints.
+Stub classes (`DevicesServiceStub`, etc.) — the only exception, imported individually from `*_pb2_grpc` for Dishka type hints.
 
-## Proto → Pydantic маппинг
+## Proto → Pydantic Mapping
 
-Response-схемы с нетривиальным или повторяющимся маппингом **обязаны** иметь `from_proto()` classmethod:
+Response schemas with non-trivial or repetitive mapping **must** have a `from_proto()` classmethod:
 ```python
 class SensorResponse(BaseModel):
     ...
@@ -62,46 +62,46 @@ class SensorResponse(BaseModel):
         return cls(sensor_id=s.sensor_id, value_type=VALUE_TYPE_FROM_PROTO.get(...), ...)
 ```
 
-Схемы с `from_proto()`: `SensorResponse`, `ActuatorResponse`, `ThresholdResponse`, `DeviceSummaryResponse`, `PlaceResponse`.
+Schemas with `from_proto()`: `SensorResponse`, `ActuatorResponse`, `ThresholdResponse`, `DeviceSummaryResponse`, `PlaceResponse`.
 
-**Правило:** если маппинг содержит enum-преобразование или используется более одного раза — выносить в `from_proto()`.
+**Rule:** if the mapping contains enum conversion or is used more than once — extract into `from_proto()`.
 
-## Enum-маппинги
+## Enum Mappings
 
-- Все enum-типы — `StrEnum` в `src/core/enums.py`
-- Маппинги proto int ↔ StrEnum используют **именованные proto-константы** (`ROLE_OWNER`, `DEVICE_STATUS_ONLINE`), не магические числа
-- **Не использовать** plain `str` для полей с ограниченным набором значений — всегда StrEnum
+- All enum types are `StrEnum` in `src/core/enums.py`
+- Proto int ↔ StrEnum mappings use **named proto constants** (`ROLE_OWNER`, `DEVICE_STATUS_ONLINE`), not magic numbers
+- **Do not use** plain `str` for fields with a limited set of values — always StrEnum
 
-## Обработка ошибок
+## Error Handling
 
-- Централизованные exception handlers в `src/api/exception_handlers.py` — **не дублировать try/except в контроллерах** для gRPC-ошибок
-- При добавлении нового gRPC StatusCode — **обязательно добавить маппинг** в `exception_handlers.py`
-- **Cascade delete:** cleanup-операции, которые могут упасть, оборачивать в try/except и возвращать `DeleteResponse(warnings=[...])`, не глотать ошибки молча
-- OpenAPI error responses: документировать через `responses={**AUTH_ERRORS, **FORBIDDEN_ERRORS, ...}` из `src/schemas/base.py`
+- Centralized exception handlers in `src/api/exception_handlers.py` — **do not duplicate try/except in controllers** for gRPC errors
+- When adding a new gRPC StatusCode — **must add mapping** in `exception_handlers.py`
+- **Cascade delete:** cleanup operations that can fail should be wrapped in try/except and return `DeleteResponse(warnings=[...])`, do not silently swallow errors
+- OpenAPI error responses: document via `responses={**AUTH_ERRORS, **FORBIDDEN_ERRORS, ...}` from `src/schemas/base.py`
 
-## Типизация
+## Typing
 
-- **ID:** `uuid.UUID` (не `str`). При передаче в gRPC: `str(place_id)`
-- **Datetime:** `datetime` (не `str`). `last_seen_at` из gRPC может быть пустой строкой → `d.last_seen_at or None`
-- **None vs falsy:** для optional числовых полей — `x if x is not None else default`, не `x or default`
+- **ID:** `uuid.UUID` (not `str`). When passing to gRPC: `str(place_id)`
+- **Datetime:** `datetime` (not `str`). `last_seen_at` from gRPC may be an empty string → `d.last_seen_at or None`
+- **None vs falsy:** for optional numeric fields — `x if x is not None else default`, not `x or default`
 
-## Shared schemas (`src/schemas/base.py`)
+## Shared Schemas (`src/schemas/base.py`)
 
 - `PaginatedResponse[T]`, `SuccessResponse`, `DeleteResponse`, `ErrorResponse`, `PaginationParams`
-- Пагинация реализована только для `ListDevices`. Остальные list-эндпоинты возвращают простые списки. **Не добавлять** gateway-side slicing
+- Pagination is implemented only for `ListDevices`. Other list endpoints return plain lists. **Do not add** gateway-side slicing
 
-## HTTP status codes
+## HTTP Status Codes
 
-- **201 Created:** POST-эндпоинты создания ресурсов (register, create_place, create_device, create_sensor, create_actuator, set_threshold)
-- **200 OK:** POST-эндпоинты действий (login, refresh, logout, send-otp, verify-otp, regenerate-token, send-command, mqtt/credentials)
+- **201 Created:** POST endpoints for resource creation (register, create_place, create_device, create_sensor, create_actuator, set_threshold)
+- **200 OK:** POST endpoints for actions (login, refresh, logout, send-otp, verify-otp, regenerate-token, send-command, mqtt/credentials)
 
-## MQTT credentials инвалидация
+## MQTT Credentials Invalidation
 
-Gateway вызывает `devices.InvalidateMqttCredentials(user_ids)` при мутациях, меняющих состав локаций:
+Gateway calls `devices.InvalidateMqttCredentials(user_ids)` on mutations that change location membership:
 - **create_place** → `current_user`
-- **delete_place** → все участники (получить `ListMembers` **до** удаления)
+- **delete_place** → all members (fetch `ListMembers` **before** deletion)
 - **add_member** → `target_user`
 - **remove_member** → `target_user`
-- **update_member_role** — инвалидация **не нужна** (роль не влияет на `allowed_place_ids`)
+- **update_member_role** — invalidation **not needed** (role does not affect `allowed_place_ids`)
 
-Инвалидация — fire-and-forget: ошибка логируется, но не ломает ответ.
+Invalidation is fire-and-forget: errors are logged but do not break the response.
