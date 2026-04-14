@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from src.api.enums import (
+from src.core.enums import (
     SEVERITY_FROM_PROTO,
     STATUS_FROM_PROTO,
     THRESHOLD_TYPE_FROM_PROTO,

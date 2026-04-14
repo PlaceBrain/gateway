@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from placebrain_contracts import devices_pb2 as devices_pb
 from placebrain_contracts.devices_pb2_grpc import DevicesServiceStub
 
-from src.api.enums import SEVERITY_TO_PROTO, THRESHOLD_TYPE_TO_PROTO
+from src.core.enums import SEVERITY_TO_PROTO, THRESHOLD_TYPE_TO_PROTO
 from src.dependencies.auth import AuthenticatedUser
 from src.schemas.base import (
     AUTH_ERRORS,

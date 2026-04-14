@@ -14,7 +14,7 @@ from placebrain_contracts.collector_pb2_grpc import CollectorServiceStub
 from placebrain_contracts.devices_pb2_grpc import DevicesServiceStub
 from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
 
-from src.api.enums import ROLE_FROM_PROTO, ROLE_TO_PROTO
+from src.core.enums import ROLE_FROM_PROTO, ROLE_TO_PROTO
 from src.dependencies.auth import AuthenticatedUser
 from src.schemas.base import (
     AUTH_ERRORS,

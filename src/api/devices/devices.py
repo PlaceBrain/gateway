@@ -9,7 +9,7 @@ from placebrain_contracts import devices_pb2 as devices_pb
 from placebrain_contracts.collector_pb2_grpc import CollectorServiceStub
 from placebrain_contracts.devices_pb2_grpc import DevicesServiceStub
 
-from src.api.enums import STATUS_FROM_PROTO
+from src.core.enums import STATUS_FROM_PROTO
 from src.dependencies.auth import AuthenticatedUser
 from src.schemas.base import (
     AUTH_ERRORS,

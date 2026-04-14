@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from src.api.enums import ROLE_FROM_PROTO, PlaceRole
+from src.core.enums import ROLE_FROM_PROTO, PlaceRole
 
 
 class CreatePlaceRequest(BaseModel):

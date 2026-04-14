@@ -4,12 +4,15 @@
 - FastAPI + Hypercorn, DI через Dishka с FastAPI-интеграцией
 - OpenAPI: `title="PlaceBrain API"`, `version="1.0.0"`
 
-## Структура роутов
+## Структура
 
 ```
+src/core/
+├── config.py                # Pydantic Settings
+└── enums.py                 # StrEnum + proto-маппинги (единый файл)
+
 src/api/
 ├── __init__.py              # Сборка всех роутеров в api_router
-├── enums.py                 # StrEnum + proto-маппинги (единый файл)
 ├── exception_handlers.py    # gRPC → HTTP маппинг ошибок
 ├── utils.py                 # Генерация openapi.json
 ├── auth/                    # /api/auth — регистрация, логин, JWT, OTP
@@ -65,7 +68,7 @@ class SensorResponse(BaseModel):
 
 ## Enum-маппинги
 
-- Все enum-типы — `StrEnum` в `src/api/enums.py`
+- Все enum-типы — `StrEnum` в `src/core/enums.py`
 - Маппинги proto int ↔ StrEnum используют **именованные proto-константы** (`ROLE_OWNER`, `DEVICE_STATUS_ONLINE`), не магические числа
 - **Не использовать** plain `str` для полей с ограниченным набором значений — всегда StrEnum
 
