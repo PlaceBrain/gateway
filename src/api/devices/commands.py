@@ -26,7 +26,7 @@ async def send_command(
     body: SendCommandRequest,
     stub: FromDishka[DevicesServiceStub],
     current_user: AuthenticatedUser,
-):
+) -> SuccessResponse:
     response = await stub.SendCommand(
         devices_pb.SendCommandRequest(
             user_id=current_user.user_id,

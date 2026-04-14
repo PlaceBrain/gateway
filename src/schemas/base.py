@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, Query
 from pydantic import BaseModel
@@ -40,7 +40,15 @@ PaginationParams = Annotated[_PaginationParams, Depends()]
 
 
 # Shared error response dicts for OpenAPI documentation
-AUTH_ERRORS = {401: {"description": "Not authenticated", "model": ErrorResponse}}
-FORBIDDEN_ERRORS = {403: {"description": "Permission denied", "model": ErrorResponse}}
-NOT_FOUND_ERRORS = {404: {"description": "Resource not found", "model": ErrorResponse}}
-CONFLICT_ERRORS = {409: {"description": "Resource already exists", "model": ErrorResponse}}
+AUTH_ERRORS: dict[int | str, dict[str, Any]] = {
+    401: {"description": "Not authenticated", "model": ErrorResponse}
+}
+FORBIDDEN_ERRORS: dict[int | str, dict[str, Any]] = {
+    403: {"description": "Permission denied", "model": ErrorResponse}
+}
+NOT_FOUND_ERRORS: dict[int | str, dict[str, Any]] = {
+    404: {"description": "Resource not found", "model": ErrorResponse}
+}
+CONFLICT_ERRORS: dict[int | str, dict[str, Any]] = {
+    409: {"description": "Resource already exists", "model": ErrorResponse}
+}

@@ -1,4 +1,5 @@
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from dishka import make_async_container
@@ -20,7 +21,7 @@ container = make_async_container(
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logging.basicConfig(
         level=settings.logging.level_value,
         format=settings.logging.format,
