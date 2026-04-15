@@ -120,10 +120,10 @@ async def delete_place(
     stub: FromDishka[PlacesServiceStub],
     current_user: AuthenticatedUser,
 ) -> DeleteResponse:
-    await stub.DeletePlace(
+    response = await stub.DeletePlace(
         places_pb.DeletePlaceRequest(user_id=current_user.user_id, place_id=str(place_id))
     )
-    return DeleteResponse(success=True)
+    return DeleteResponse(success=response.success)
 
 
 @router.post(

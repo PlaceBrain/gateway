@@ -95,13 +95,11 @@ Schemas with `from_proto()`: `SensorResponse`, `ActuatorResponse`, `ThresholdRes
 - **201 Created:** POST endpoints for resource creation (register, create_place, create_device, create_sensor, create_actuator, set_threshold)
 - **200 OK:** POST endpoints for actions (login, refresh, logout, send-otp, verify-otp, regenerate-token, send-command, mqtt/credentials)
 
-## MQTT Credentials Invalidation
+## Cascade Operations (Event-Driven)
 
-Gateway calls `devices.InvalidateMqttCredentials(user_ids)` on mutations that change location membership:
-- **create_place** → `current_user`
-- **delete_place** → all members (fetch `ListMembers` **before** deletion)
-- **add_member** → `target_user`
-- **remove_member** → `target_user`
-- **update_member_role** — invalidation **not needed** (role does not affect `allowed_place_ids`)
+Cascade operations (MQTT credential invalidation, device cleanup, readings deletion) are **no longer orchestrated by gateway**. They are handled via Kafka events:
+- **places service** publishes `PlaceDeleted`, `MemberAdded`, `MemberRemoved`, `MemberRoleChanged` events
+- **devices service** consumes these events and handles credential invalidation + device cleanup
+- **collector service** consumes `DevicesBulkDeleted`/`DeviceDeleted` events for readings cleanup
 
-Invalidation is fire-and-forget: errors are logged but do not break the response.
+Gateway simply calls the gRPC method (e.g., `DeletePlace`) and returns the result.
