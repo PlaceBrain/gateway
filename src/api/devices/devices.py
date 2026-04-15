@@ -1,12 +1,9 @@
 import logging
 from uuid import UUID
 
-import grpc
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter
-from placebrain_contracts import collector_pb2 as collector_pb
 from placebrain_contracts import devices_pb2 as devices_pb
-from placebrain_contracts.collector_pb2_grpc import CollectorServiceStub
 from placebrain_contracts.devices_pb2_grpc import DevicesServiceStub
 
 from src.core.enums import STATUS_FROM_PROTO, DeviceStatus
@@ -149,7 +146,6 @@ async def delete_device(
     place_id: UUID,
     device_id: UUID,
     stub: FromDishka[DevicesServiceStub],
-    collector_stub: FromDishka[CollectorServiceStub],
     current_user: AuthenticatedUser,
 ) -> DeleteResponse:
     response = await stub.DeleteDevice(
@@ -157,15 +153,7 @@ async def delete_device(
             user_id=current_user.user_id, place_id=str(place_id), device_id=str(device_id)
         )
     )
-    warnings: list[str] = []
-    try:
-        await collector_stub.DeleteReadings(
-            collector_pb.DeleteReadingsRequest(device_ids=[str(device_id)])
-        )
-    except grpc.aio.AioRpcError:
-        logger.warning("Failed to cleanup readings for device %s", device_id)
-        warnings.append("Failed to cleanup telemetry readings")
-    return DeleteResponse(success=response.success, warnings=warnings)
+    return DeleteResponse(success=response.success)
 
 
 @router.post(
