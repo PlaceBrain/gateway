@@ -1,5 +1,13 @@
 from enum import StrEnum
 
+from placebrain_contracts.collector_pb2 import (
+    ALERT_SEVERITY_CRITICAL,
+    ALERT_SEVERITY_WARNING,
+    ALERT_STATUS_ACTIVE,
+    ALERT_STATUS_RESOLVED,
+    ALERT_THRESHOLD_TYPE_MAX,
+    ALERT_THRESHOLD_TYPE_MIN,
+)
 from placebrain_contracts.devices_pb2 import (
     DEVICE_STATUS_OFFLINE,
     DEVICE_STATUS_ONLINE,
@@ -75,3 +83,38 @@ SEVERITY_FROM_PROTO: dict[int, ThresholdSeverity] = {
     THRESHOLD_SEVERITY_CRITICAL: ThresholdSeverity.CRITICAL,
 }
 SEVERITY_TO_PROTO: dict[ThresholdSeverity, int] = {v: k for k, v in SEVERITY_FROM_PROTO.items()}
+
+
+class AlertSeverity(StrEnum):
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+
+class AlertStatus(StrEnum):
+    ACTIVE = "active"
+    RESOLVED = "resolved"
+
+
+class AlertThresholdType(StrEnum):
+    MIN = "min"
+    MAX = "max"
+
+
+ALERT_SEVERITY_FROM_PROTO: dict[int, AlertSeverity] = {
+    ALERT_SEVERITY_WARNING: AlertSeverity.WARNING,
+    ALERT_SEVERITY_CRITICAL: AlertSeverity.CRITICAL,
+}
+ALERT_SEVERITY_TO_PROTO: dict[AlertSeverity, int] = {
+    v: k for k, v in ALERT_SEVERITY_FROM_PROTO.items()
+}
+
+ALERT_STATUS_FROM_PROTO: dict[int, AlertStatus] = {
+    ALERT_STATUS_ACTIVE: AlertStatus.ACTIVE,
+    ALERT_STATUS_RESOLVED: AlertStatus.RESOLVED,
+}
+ALERT_STATUS_TO_PROTO: dict[AlertStatus, int] = {v: k for k, v in ALERT_STATUS_FROM_PROTO.items()}
+
+ALERT_THRESHOLD_TYPE_FROM_PROTO: dict[int, AlertThresholdType] = {
+    ALERT_THRESHOLD_TYPE_MIN: AlertThresholdType.MIN,
+    ALERT_THRESHOLD_TYPE_MAX: AlertThresholdType.MAX,
+}
